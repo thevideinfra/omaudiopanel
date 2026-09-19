@@ -2,6 +2,11 @@
 
 Omarchy's audio panel, with the controls it was missing.
 
+<p>
+  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel with outputs, inputs, an app in the mixer, disabled devices and the volume step" width="360">
+  <img src="assets/omaudioroute.png" alt="The same panel with Chromium's output picker open, including the option to always play it on one output" width="360">
+</p>
+
 A drop-in replacement for the built-in `omarchy.audio` bar widget. Everything
 the stock panel does still works the same way — volume, output and input
 pickers, the per-app mixer, keyboard navigation — and it adds:
