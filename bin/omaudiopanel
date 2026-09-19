@@ -1,0 +1,257 @@
+#!/bin/bash
+
+# Helpers for the omaudiopanel audio panel: disabling audio devices and routing
+# individual application streams to a specific output.
+#
+#   omaudiopanel list-disabled                    name<TAB>kind<TAB>label<TAB>card<TAB>part
+#   omaudiopanel disable <node-name> <sink|source> <label>
+#   omaudiopanel enable <node-name>
+#   omaudiopanel list-streams                     id<TAB>current<TAB>routed<TAB>app<TAB>paused(0|1)
+#   omaudiopanel list-pins                        app<TAB>sink-name<TAB>sink-label
+#   omaudiopanel pin <app> <sink-name> <label>    always play <app> on that output
+#   omaudiopanel unpin <app>
+#   omaudiopanel apply-pins                       route new streams of pinned apps
+#   omaudiopanel route <stream-id> <sink-name>
+#   omaudiopanel unroute <stream-id>
+#   omaudiopanel set-default-sink <node-id> <sink-name>
+#   omaudiopanel volume <up|down>                 step by the panel's scrollStep
+#
+# Disabling switches the device's card to the profile without that output or
+# input (e.g. output:analog-stereo+input:mono-fallback -> output:analog-stereo),
+# or to "off" when nothing else is left. Only that card changes, so other
+# devices keep playing, and WirePlumber restores the chosen profile after a
+# reboot. Routing sets target.object in the default metadata, which
+# WirePlumber follows; when that output is missing it falls back to the
+# default and relinks once the output returns. A pin applies that route to
+# every stream of an app that was not routed by hand.
+
+set -u
+
+state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/omaudiopanel
+state_file=$state_dir/disabled-nodes
+pins_file=$state_dir/pins
+shell_config=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json
+
+usage() {
+  sed -n '6,17p' "$0" | sed 's/^# \{0,3\}//' >&2
+  exit 1
+}
+
+remove_entry() {
+  local target=$1
+  [[ -f $state_file ]] || return 0
+  awk -F'\t' -v n="$target" '$1 != n' "$state_file" >"$state_file.tmp" && mv "$state_file.tmp" "$state_file"
+}
+
+# Pick an available profile on a card. $2 is a JSON array of profile parts
+# ("output:analog-stereo", "input:mono-fallback") the result should have;
+# $3 is a part that must be included, or "" for none. Prefers an exact match,
+# then the highest-priority profile using only wanted parts (and the required
+# one), and falls back to "off".
+choose_profile() {
+  local card_json=$1 want=$2 need=$3
+  jq -r --argjson want "$want" --arg need "$need" '
+    [.profiles | to_entries[]
+      | select(.value.available and .key != "off" and .key != "pro-audio")
+      | {name: .key, prio: .value.priority, parts: (.key | split("+"))}] as $all
+    | ($all | map(select((.parts | sort) == ($want | sort))) | .[0].name) //
+      ($all
+        | map(select((.parts - $want) == [] and ($need == "" or (.parts | index($need)))))
+        | sort_by(-.prio) | .[0].name) //
+      "off"' <<<"$card_json"
+}
+
+card_json() {
+  timeout 2 pactl -f json list cards 2>/dev/null | jq -c --arg c "$1" '.[] | select(.name == $c)'
+}
+
+# id<TAB>routed-sink for every stream with a target in the default metadata.
+stream_routes() {
+  timeout 2 pw-metadata 2>/dev/null \
+    | sed -n "s/^update: id:\([0-9]*\) key:'target\.object' value:'\([^']*\)'.*/\1\t\2/p"
+}
+
+# id<TAB>app for every application playback stream.
+stream_apps() {
+  timeout 2 pactl -f json list sink-inputs 2>/dev/null \
+    | jq -r '.[] | select(.properties["object.id"] != null and .properties["application.name"] != null)
+        | "\(.properties["object.id"])\t\(.properties["application.name"])"'
+}
+
+apply_pins() {
+  [[ -s $pins_file ]] || return 0
+  local sinks routes id app pin
+  sinks=" $(timeout 2 pactl -f json list sinks 2>/dev/null | jq -r '.[].name' | tr '\n' ' ') "
+  routes=$(stream_routes)
+  while IFS=$'\t' read -r id app; do
+    pin=$(awk -F'\t' -v a="$app" '$1 == a { print $2; exit }' "$pins_file")
+    [[ -n $pin && $sinks == *" $pin "* ]] || continue
+    awk -F'\t' -v id="$id" '$1 == id { found = 1 } END { exit !found }' <<<"$routes" && continue
+    timeout 2 pw-metadata "$id" target.object "$pin" >/dev/null
+  done < <(stream_apps)
+}
+
+routed_stream_ids() {
+  timeout 2 pw-metadata 2>/dev/null \
+    | sed -n "s/^update: id:\([0-9]*\) key:'target\.\(object\|node\)'.*/\1/p" \
+    | sort -u
+}
+
+cmd=${1:-}
+shift || true
+
+case $cmd in
+  list-disabled)
+    [[ -f $state_file ]] && cat "$state_file"
+    exit 0
+    ;;
+
+  disable)
+    name=${1:-} kind=${2:-} label=${3:-}
+    [[ -n $name && ( $kind == sink || $kind == source ) ]] || usage
+    label=${label//$'\t'/ }
+
+    read -r card profile_name < <(timeout 2 pactl -f json list "${kind}s" 2>/dev/null \
+      | jq -r --arg n "$name" '.[] | select(.name == $n)
+          | "\(.properties["device.name"] // "") \(.properties["device.profile.name"] // "")"')
+    [[ -n ${card:-} && -n ${profile_name:-} ]] || { echo "No card profile found for $name" >&2; exit 1; }
+
+    [[ $kind == sink ]] && part="output:$profile_name" || part="input:$profile_name"
+    json=$(card_json "$card")
+    active=$(jq -r '.active_profile' <<<"$json")
+    remaining=$(jq -cn --arg a "$active" --arg p "$part" '$a | split("+") | map(select(. != $p and . != "off"))')
+    if [[ $remaining == "[]" ]]; then
+      target=off
+    else
+      target=$(choose_profile "$json" "$remaining" "")
+    fi
+
+    timeout 2 pactl set-card-profile "$card" "$target" || exit 1
+    mkdir -p "$state_dir"
+    remove_entry "$name"
+    printf '%s\t%s\t%s\t%s\t%s\n' "$name" "$kind" "${label:-$name}" "$card" "$part" >>"$state_file"
+    ;;
+
+  enable)
+    name=${1:-}
+    [[ -n $name && -f $state_file ]] || usage
+    IFS=$'\t' read -r _ _ _ card part < <(awk -F'\t' -v n="$name" '$1 == n' "$state_file")
+    if [[ -n ${card:-} && -n ${part:-} ]]; then
+      json=$(card_json "$card")
+      active=$(jq -r '.active_profile' <<<"$json")
+      want=$(jq -cn --arg a "$active" --arg p "$part" '($a | split("+") | map(select(. != "off" and . != "pro-audio"))) + [$p] | unique')
+      target=$(choose_profile "$json" "$want" "$part")
+      timeout 2 pactl set-card-profile "$card" "$target" || exit 1
+    fi
+    remove_entry "$name"
+    ;;
+
+  volume)
+    # Same step as the bar icon's scroll wheel, for the volume keys and any
+    # hardware volume wheel that sends them.
+    step=$(jq -r '[.. | objects | select(.id? == "videinfra.omaudiopanel") | .scrollStep? // empty][0] // 5' "$shell_config" 2>/dev/null)
+    [[ $step =~ ^[0-9]+$ ]] || step=5
+    case ${1:-} in
+      up) exec omarchy-audio-output-volume "+$step" ;;
+      down) exec omarchy-audio-output-volume "-$step" ;;
+      *) usage ;;
+    esac
+    ;;
+
+  list-streams)
+    # Current sink comes from pactl rather than the shell's PipeWire link
+    # tracking, which does not report links for stream nodes.
+    routes=$(stream_routes)
+    sinks=$(timeout 2 pactl -f json list sinks 2>/dev/null | jq -c 'map({(.index | tostring): .name}) | add // {}')
+    [[ -n $sinks ]] || sinks='{}'
+    timeout 2 pactl -f json list sink-inputs 2>/dev/null \
+      | jq -r --argjson sinks "$sinks" '.[]
+          | select(.properties["object.id"] != null)
+          | [.properties["object.id"], ($sinks[.sink | tostring] // ""),
+             (.properties["application.name"] // ""), (if .corked then "1" else "0" end)]
+          | @tsv' \
+      | while IFS=$'\t' read -r id current app paused; do
+          routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
+          printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$current" "$routed" "$app" "$paused"
+        done
+    exit 0
+    ;;
+
+  list-pins)
+    [[ -f $pins_file ]] && cat "$pins_file"
+    exit 0
+    ;;
+
+  pin)
+    app=${1:-} sink=${2:-} label=${3:-}
+    [[ -n $app && -n $sink ]] || usage
+    mkdir -p "$state_dir"
+    [[ -f $pins_file ]] && awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
+    printf '%s\t%s\t%s\n' "$app" "$sink" "${label:-$sink}" >>"$pins_file"
+    apply_pins
+    ;;
+
+  unpin)
+    app=${1:-}
+    [[ -n $app ]] || usage
+    [[ -f $pins_file ]] || exit 0
+    pin=$(awk -F'\t' -v a="$app" '$1 == a { print $2; exit }' "$pins_file")
+    awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
+    [[ -n $pin ]] || exit 0
+    # Streams the pin put on that output go back to the default; streams
+    # routed elsewhere by hand stay where they are.
+    routes=$(stream_routes)
+    while IFS=$'\t' read -r id stream_app; do
+      [[ $stream_app == "$app" ]] || continue
+      routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
+      if [[ $routed == "$pin" ]]; then
+        timeout 2 pw-metadata -d "$id" target.object >/dev/null
+        timeout 2 pw-metadata -d "$id" target.node >/dev/null
+      fi
+    done < <(stream_apps)
+    ;;
+
+  apply-pins)
+    apply_pins
+    ;;
+
+  route)
+    id=${1:-} sink=${2:-}
+    [[ -n $id && -n $sink ]] || usage
+    timeout 2 pw-metadata "$id" target.object "$sink" >/dev/null
+    ;;
+
+  unroute)
+    id=${1:-}
+    [[ -n $id ]] || usage
+    timeout 2 pw-metadata -d "$id" target.object >/dev/null
+    timeout 2 pw-metadata -d "$id" target.node >/dev/null
+    ;;
+
+  set-default-sink)
+    # Same as omarchy-audio-output-set-default, except streams routed to a
+    # specific output from this panel are left where they are.
+    node_id=${1:-} sink_name=${2:-}
+    [[ -n $node_id && -n $sink_name ]] || usage
+
+    timeout 2 wpctl set-default "$node_id" 2>/dev/null || true
+    timeout 2 pactl set-default-sink "$sink_name" 2>/dev/null || true
+
+    routed=" $(routed_stream_ids | tr '\n' ' ') "
+
+    timeout 2 pactl -f json list sink-inputs 2>/dev/null \
+      | jq -r '.[]
+          | select(.properties["application.name"] != null
+                   and .properties["application.name"] != "EasyEffects")
+          | "\(.index)\t\(.properties["object.id"] // "")"' \
+      | while IFS=$'\t' read -r index object_id; do
+          [[ -z $index ]] && continue
+          [[ -n $object_id && $routed == *" $object_id "* ]] && continue
+          timeout 2 pactl move-sink-input "$index" "$sink_name" 2>/dev/null || true
+        done
+    ;;
+
+  *)
+    usage
+    ;;
+esac

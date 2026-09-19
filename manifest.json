@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "videinfra.omaudiopanel",
+  "name": "omaudiopanel",
+  "version": "0.1.0",
+  "author": "thevideinfra",
+  "license": "MIT",
+  "description": "Omarchy's audio panel plus device disabling, per-app output routing and pinning, tab titles and an adjustable volume step",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "omaudiopanel",
+    "description": "Volume, outputs and inputs you can disable, a per-app mixer with output routing and pins, and an adjustable volume step",
+    "category": "Audio",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "scrollStep": 5
+    },
+    "schema": [
+      {
+        "key": "scrollStep",
+        "type": "number",
+        "label": "Volume step (%) for scrolling, sliders and volume keys"
+      }
+    ]
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.audio"
+  }
+}

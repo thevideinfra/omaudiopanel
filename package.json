@@ -1,0 +1,8 @@
+{
+  "name": "omaudiopanel",
+  "private": true,
+  "description": "Unit tests for the audio panel's pure helpers and its shell helper. Not published; the plugin itself needs no node runtime.",
+  "scripts": {
+    "test": "node --test test/*.test.js && bash test/omaudiopanel.test.sh"
+  }
+}
