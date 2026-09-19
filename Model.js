@@ -335,6 +335,13 @@ function streamDisplayName(label, info) {
   return label
 }
 
+// The output a pin should use: the one chosen for the stream, or else the one
+// it is playing on now. info is a parseStreams entry.
+function pinTarget(info) {
+  if (!info) return ""
+  return info.routed || info.current || ""
+}
+
 // state: { currentLabel, routed, app, pin: { label } | null, pinAvailable }
 function routeSummary(state) {
   var where = "Playing on " + state.currentLabel
@@ -373,6 +380,7 @@ if (typeof module !== "undefined") {
     parsePins: parsePins,
     streamTitles: streamTitles,
     streamDisplayName: streamDisplayName,
-    routeSummary: routeSummary
+    routeSummary: routeSummary,
+    pinTarget: pinTarget
   }
 }

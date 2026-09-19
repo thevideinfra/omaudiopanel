@@ -66,3 +66,9 @@ test("routeSummary describes default, chosen, pinned, and unavailable pin", () =
   assert.equal(M.routeSummary({ currentLabel: "HS80", routed: true, app: "Brave", pin: { label: "Codec" }, pinAvailable: false }),
     "Playing on HS80, Codec is unavailable")
 })
+
+test("pinTarget prefers the chosen output, then the current one", () => {
+  assert.equal(M.pinTarget({ routed: "codec", current: "hs80" }), "codec")
+  assert.equal(M.pinTarget({ routed: "", current: "hs80" }), "hs80")
+  assert.equal(M.pinTarget(null), "")
+})

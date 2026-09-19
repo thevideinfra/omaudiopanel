@@ -612,12 +612,16 @@ Panel {
     return info ? info.routed : ""
   }
 
+  function sinkLabelFor(name) {
+    for (var i = 0; i < displayAudioSinks.length; i++)
+      if (String(displayAudioSinks[i].name) === name) return nodeLabel(displayAudioSinks[i])
+    return name
+  }
+
   function streamCurrentSinkLabel(stream) {
     var info = stream ? streamInfo[stream.id] : null
     if (!info || !info.current) return "Default output"
-    for (var i = 0; i < displayAudioSinks.length; i++)
-      if (String(displayAudioSinks[i].name) === info.current) return nodeLabel(displayAudioSinks[i])
-    return info.current
+    return sinkLabelFor(info.current)
   }
 
   // sinkNode null means follow the default output again.
@@ -1690,16 +1694,16 @@ Panel {
           }
         }
 
-        // Only meaningful once a specific output is chosen for this stream.
+        // Pins the app to the output chosen above, or to the one it is on now.
         Text {
           id: pinToggle
           readonly property var pin: root.streamPin(streamRow.node)
-          readonly property string routedName: root.streamRouteName(streamRow.node)
-          readonly property bool checked: !!pin && pin.sink === routedName
-          visible: routedName !== ""
+          readonly property string targetName: Model.pinTarget(root.streamInfo[streamRow.node ? streamRow.node.id : -1])
+          readonly property bool checked: !!pin && pin.sink === targetName
+          visible: targetName !== ""
           textFormat: Text.PlainText
           text: (checked ? "󰄲  " : "󰄱  ") + "Always play " + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node))
-            + " on this output"
+            + " on " + root.sinkLabelFor(targetName)
           color: pinMouse.containsMouse || checked ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25)
           font.family: root.bar.fontFamily
           font.pixelSize: Style.font.caption
@@ -1719,11 +1723,7 @@ Panel {
                 root.unpinStream(streamRow.node)
                 return
               }
-              var label = pinToggle.routedName
-              for (var i = 0; i < root.displayAudioSinks.length; i++)
-                if (String(root.displayAudioSinks[i].name) === pinToggle.routedName)
-                  label = root.nodeLabel(root.displayAudioSinks[i])
-              root.pinStream(streamRow.node, pinToggle.routedName, label)
+              root.pinStream(streamRow.node, pinToggle.targetName, root.sinkLabelFor(pinToggle.targetName))
             }
           }
         }
