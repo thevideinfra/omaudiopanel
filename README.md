@@ -3,8 +3,8 @@
 Omarchy's audio panel, with the controls it was missing.
 
 <p>
-  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel with outputs, inputs, an app in the mixer, disabled devices and the volume step" width="360">
-  <img src="assets/omaudioroute.png" alt="The same panel with Chromium's output picker open, including the option to always play it on one output" width="360">
+  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: outputs, inputs, Brave in the mixer with its output field, the folded Disabled section and the volume step" width="360">
+  <img src="assets/omaudioroute.png" alt="The same panel with Brave's output picker open, the option to always play it on one output, and the power icon for disabling an output" width="360">
 </p>
 
 A drop-in replacement for the built-in `omarchy.audio` bar widget. Everything
@@ -12,10 +12,11 @@ the stock panel does still works the same way — volume, output and input
 pickers, the per-app mixer, keyboard navigation — and it adds:
 
 - **Disable devices.** Hover an output or input and click the power icon (or
-  press `d`). Disabled devices move to a **Disabled** section at the bottom;
-  click one to turn it back on. Nothing else is interrupted.
-- **Choose where each app plays.** Under every app in the mixer, "Playing on
-  CORSAIR HS80" shows its output. Click **Change** to send it somewhere else
+  press `d`). Disabled devices collect in a **Disabled** section at the bottom,
+  folded into one line ("4 devices turned off"). Click **Show** to list them,
+  then click one to turn it back on. Nothing else is interrupted.
+- **Choose where each app plays.** Under every app in the mixer, a
+  "Playing on CORSAIR HS80" field shows its output. Click it to pick another
   (or press `r` to step through outputs).
 - **Pin an app to an output.** In that picker, tick **Always play Brave on
   USB AUDIO CODEC** — the output you picked, or the one it is playing on. Every
