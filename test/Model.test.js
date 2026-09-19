@@ -72,3 +72,10 @@ test("pinTarget prefers the chosen output, then the current one", () => {
   assert.equal(M.pinTarget({ routed: "", current: "hs80" }), "hs80")
   assert.equal(M.pinTarget(null), "")
 })
+
+test("streamTitles accepts Quickshell's array-like player list", () => {
+  // Mpris.players.values reaches JS as a list-like object, not an Array.
+  const players = { length: 1, 0: player("Brave Origin", "Houston vs Texas Tech", true) }
+  const titles = M.streamTitles([{ id: "71", app: "Brave", paused: false }], players)
+  assert.equal(titles["71"].title, "Houston vs Texas Tech")
+})

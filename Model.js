@@ -296,7 +296,8 @@ function streamTitles(streams, players) {
     groups[key].push(list[i])
   }
 
-  var allPlayers = Array.isArray(players) ? players : []
+  // Quickshell's player list is array-like rather than an Array.
+  var allPlayers = players && players.length !== undefined ? Array.prototype.slice.call(players) : []
   for (var g = 0; g < order.length; g++) {
     var group = groups[order[g]]
     var app = group[0].app
