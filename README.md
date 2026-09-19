@@ -13,7 +13,8 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   CORSAIR HS80" shows its output. Click **Change** to send it somewhere else
   (or press `r` to step through outputs).
 - **Pin an app to an output.** In that picker, tick **Always play Brave on
-  this output**. Every new Brave stream goes there. If the output disappears,
+  USB AUDIO CODEC** — the output you picked, or the one it is playing on. Every
+  new Brave stream goes there. If the output disappears,
   Brave falls back to the default and moves back when the output returns.
 - **Tell browser tabs apart.** Chromium-based browsers name every stream
   "Playback". When it can tell for certain, the mixer shows the tab instead:
