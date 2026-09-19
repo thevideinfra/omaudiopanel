@@ -165,7 +165,8 @@ Panel {
   //   "output"  — output slider + sink device list
   //   "input"   — input slider + source device list
   //   "streams" — per-app playback streams
-  //   "disabled" — devices disabled from this panel (Enter re-enables)
+  //   "disabled" — devices disabled from this panel; -1 is the Show/Hide
+  //                field, rows appear once it is open (Enter re-enables)
   // selectedIndex semantics within a section:
   //   -1            → on the slider row (h/l adjusts volume, m/Enter mute)
   //   0..N-1        → on the Nth device/stream row
@@ -198,7 +199,7 @@ Panel {
     if (section === "output") return displayAudioSinks.length
     if (section === "input") return displayAudioSources.length
     if (section === "streams") return displayAudioStreams.length
-    if (section === "disabled") return disabledDevices.length
+    if (section === "disabled") return disabledExpanded ? disabledDevices.length : 0
     return 0
   }
 
@@ -213,6 +214,7 @@ Panel {
   function sectionHasSlider(section) {
     if (section === "output") return true
     if (section === "input") return !!source
+    if (section === "disabled") return true  // index -1 is the Show/Hide field
     return false  // stream rows carry their own sliders inline; not a section-level slider
   }
 
@@ -320,7 +322,8 @@ Panel {
       if (st && st.audio) st.audio.muted = !st.audio.muted
       return
     }
-    if (focusSection === "disabled" && selectedIndex >= 0)
+    if (focusSection === "disabled" && selectedIndex === -1) disabledExpanded = !disabledExpanded
+    else if (focusSection === "disabled" && selectedIndex >= 0 && selectedIndex < disabledDevices.length)
       enableDevice(disabledDevices[selectedIndex])
   }
 
@@ -329,6 +332,7 @@ Panel {
       refreshDisplayAudioModels()
       refreshHelperState()
       expandedStreamId = -1
+      disabledExpanded = false
       focusSection = "output"
       selectedIndex = -1  // first keyboard cursor reveal starts on the output slider
       cursorActive = false
@@ -386,21 +390,25 @@ Panel {
     if (!item || !scrollArea) return
     var flick = scrollArea.contentItem
     if (!flick || flick.contentY === undefined) return
-    var margin = 6
-    var maxY = Math.max(0, (flick.contentHeight || 0) - flick.height)
-    if (maxY <= Style.space(24) || (root.focusSection === "output" && root.selectedIndex === -1)) {
-      flick.contentY = 0
-      return
-    }
+    // Stock snapped to the top whenever the overflow was under
+    // Style.space(24), or whenever the cursor touched the output slider.
+    // Hover handlers pass through the output slider on their way to a row,
+    // and this panel's extra sections overflow only a little, so both made
+    // the footer unreachable. Only move when the row is out of view.
     var pt = item.mapToItem(flick.contentItem || flick, 0, 0)
-    var top = pt.y
-    var bottom = top + (item.height || 0)
-    var viewTop = flick.contentY
-    var viewBottom = viewTop + flick.height
-    if (top < viewTop + margin) flick.contentY = Math.max(0, Math.min(maxY, top - margin))
-    else if (bottom > viewBottom - margin)
-      flick.contentY = Math.max(0, Math.min(maxY, bottom + margin - flick.height))
+    var target = Model.scrollTargetFor({
+      top: pt.y,
+      bottom: pt.y + (item.height || 0),
+      viewTop: flick.contentY,
+      viewHeight: flick.height,
+      maxY: Math.max(0, (flick.contentHeight || 0) - flick.height),
+      margin: 6
+    })
+    // Revealing the output slider shows the header above it too.
+    if (target !== flick.contentY && root.focusSection === "output" && root.selectedIndex === -1) target = 0
+    flick.contentY = target
   }
+
 
   function clampCursor() {
     var sections = visibleSections
@@ -499,6 +507,7 @@ Panel {
     String(Qt.resolvedUrl("bin/omaudiopanel")).replace(/^file:\/\//, ""))
 
   property var disabledDevices: []  // [{ name, kind, label }]
+  property bool disabledExpanded: false
   property var streamInfo: ({})     // stream node id -> { current, routed } sink names
   property int expandedStreamId: -1
 
@@ -1275,15 +1284,36 @@ Panel {
               fontFamily: root.bar.fontFamily
             }
 
-            Repeater {
-              model: root.disabledDevices
+            // Collapsed by default: the devices matter only when turning one
+            // back on.
+            DropdownField {
+              id: disabledField
+              width: parent.width
+              glyph: "󰐥"
+              summary: root.disabledDevices.length === 1
+                ? "1 device turned off"
+                : root.disabledDevices.length + " devices turned off"
+              actionText: root.disabledExpanded ? "Hide" : "Show"
+              expanded: root.disabledExpanded
+              hasCursor: root.cursorActive && root.focusSection === "disabled" && root.selectedIndex === -1
+              onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(disabledField)
+              onToggled: root.disabledExpanded = !root.disabledExpanded
+              onHeaderHovered: {
+                root.cursorActive = true
+                root.focusSection = "disabled"
+                root.selectedIndex = -1
+              }
 
-              DisabledRow {
-                required property var modelData
-                required property int index
-                width: panelColumn.width
-                entry: modelData
-                rowIndex: index
+              Repeater {
+                model: root.disabledExpanded ? root.disabledDevices : []
+
+                DisabledRow {
+                  required property var modelData
+                  required property int index
+                  width: disabledField.bodyWidth
+                  entry: modelData
+                  rowIndex: index
+                }
               }
             }
           }
@@ -1602,128 +1632,92 @@ Panel {
         }
       }
 
-      // Where this app plays, in words, with a "Change" link that opens the
-      // output choices below it.
-      Item {
+      // Where this app plays, as a field that opens to the output choices.
+      DropdownField {
         width: parent.width
-        implicitHeight: routeSummary.implicitHeight
+        glyph: "󰓃"
+        summary: root.streamRouteSummary(streamRow.node)
+        expanded: streamRow.routeExpanded
+        onToggled: root.expandedStreamId = streamRow.routeExpanded ? -1 : streamRow.node.id
 
-        Text {
-          id: routeSummary
-          anchors.left: parent.left
-          anchors.right: routeChange.left
-          anchors.rightMargin: Style.space(8)
-          textFormat: Text.PlainText
-          text: root.streamRouteSummary(streamRow.node)
-          color: Qt.darker(root.bar.foreground, 1.3)
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
-          wrapMode: Text.WordWrap
-          maximumLineCount: 2
-          elide: Text.ElideRight
-        }
-
-        Text {
-          id: routeChange
-          anchors.right: parent.right
-          anchors.top: parent.top
-          textFormat: Text.PlainText
-          text: streamRow.routeExpanded ? "Done 󰅃" : "Change 󰅀"
-          color: root.bar.foreground
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
-          font.bold: true
-          opacity: routeChangeMouse.containsMouse ? 1.0 : 0.75
-        }
-
-        MouseArea {
-          id: routeChangeMouse
-          anchors.fill: parent
-          hoverEnabled: true
-          cursorShape: Qt.PointingHandCursor
-          onClicked: root.expandedStreamId = streamRow.routeExpanded ? -1 : streamRow.node.id
-        }
-      }
-
-      Column {
-        visible: streamRow.routeExpanded
-        width: parent.width
-        topPadding: Style.space(4)
-        spacing: Style.space(3)
-
-        Text {
-          textFormat: Text.PlainText
-          text: "Where should " + root.streamDisplayName(streamRow.node) + " play?"
-          color: root.bar.foreground
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
-          font.bold: true
-          elide: Text.ElideRight
+        Column {
           width: parent.width
-        }
-
-        Repeater {
-          model: streamRow.routeChoices
+          spacing: Style.space(3)
 
           Text {
-            required property var modelData
-            readonly property bool chosen: modelData.sink
-              ? root.streamRouteName(streamRow.node) === String(modelData.sink.name)
-              : !streamRow.routed
             textFormat: Text.PlainText
-            text: (chosen ? "󰐾  " : "󰄰  ")
-              + (modelData.sink
-                ? root.nodeLabel(modelData.sink)
-                : "Default output (" + root.nodeLabel(root.sink) + ")")
-            color: choiceMouse.containsMouse || chosen ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25)
+            text: "Where should " + root.streamDisplayName(streamRow.node) + " play?"
+            color: root.bar.foreground
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.caption
-            font.bold: chosen
+            font.bold: true
+            elide: Text.ElideRight
+            width: parent.width
+          }
+
+          Repeater {
+            model: streamRow.routeChoices
+
+            Text {
+              required property var modelData
+              readonly property bool chosen: modelData.sink
+                ? root.streamRouteName(streamRow.node) === String(modelData.sink.name)
+                : !streamRow.routed
+              textFormat: Text.PlainText
+              text: (chosen ? "󰐾  " : "󰄰  ")
+                + (modelData.sink
+                  ? root.nodeLabel(modelData.sink)
+                  : "Default output (" + root.nodeLabel(root.sink) + ")")
+              color: choiceMouse.containsMouse || chosen ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: chosen
+              elide: Text.ElideRight
+              width: parent.width
+              leftPadding: Style.space(6)
+
+              MouseArea {
+                id: choiceMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                // The picker stays open so the pin checkbox below can follow.
+                onClicked: root.routeStream(streamRow.node, parent.modelData.sink)
+              }
+            }
+          }
+
+          // Pins the app to the output chosen above, or to the one it is on now.
+          Text {
+            id: pinToggle
+            readonly property var pin: root.streamPin(streamRow.node)
+            readonly property string targetName: Model.pinTarget(root.streamInfo[streamRow.node ? streamRow.node.id : -1])
+            readonly property bool checked: !!pin && pin.sink === targetName
+            visible: targetName !== ""
+            textFormat: Text.PlainText
+            text: (checked ? "󰄲  " : "󰄱  ") + "Always play " + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node))
+              + " on " + root.sinkLabelFor(targetName)
+            color: pinMouse.containsMouse || checked ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: checked
             elide: Text.ElideRight
             width: parent.width
             leftPadding: Style.space(6)
+            topPadding: Style.space(4)
 
             MouseArea {
-              id: choiceMouse
+              id: pinMouse
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              // The picker stays open so the pin checkbox below can follow.
-              onClicked: root.routeStream(streamRow.node, parent.modelData.sink)
-            }
-          }
-        }
-
-        // Pins the app to the output chosen above, or to the one it is on now.
-        Text {
-          id: pinToggle
-          readonly property var pin: root.streamPin(streamRow.node)
-          readonly property string targetName: Model.pinTarget(root.streamInfo[streamRow.node ? streamRow.node.id : -1])
-          readonly property bool checked: !!pin && pin.sink === targetName
-          visible: targetName !== ""
-          textFormat: Text.PlainText
-          text: (checked ? "󰄲  " : "󰄱  ") + "Always play " + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node))
-            + " on " + root.sinkLabelFor(targetName)
-          color: pinMouse.containsMouse || checked ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25)
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
-          font.bold: checked
-          elide: Text.ElideRight
-          width: parent.width
-          leftPadding: Style.space(6)
-          topPadding: Style.space(4)
-
-          MouseArea {
-            id: pinMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              if (pinToggle.checked) {
-                root.unpinStream(streamRow.node)
-                return
+              onClicked: {
+                if (pinToggle.checked) {
+                  root.unpinStream(streamRow.node)
+                  return
+                }
+                root.pinStream(streamRow.node, pinToggle.targetName, root.sinkLabelFor(pinToggle.targetName))
               }
-              root.pinStream(streamRow.node, pinToggle.targetName, root.sinkLabelFor(pinToggle.targetName))
             }
           }
         }
@@ -1844,6 +1838,103 @@ Panel {
         root.selectedIndex = disabledRow.rowIndex
       }
       onClicked: root.enableDevice(disabledRow.entry)
+    }
+  }
+
+  // An outlined field that reads as "click to choose": an icon, a summary and
+  // a chevron. Its content (options) opens inside the same outline.
+  component DropdownField: CursorSurface {
+    id: field
+    property bool expanded: false
+    property string summary: ""
+    property string glyph: ""
+    property string actionText: ""
+    readonly property real bodyWidth: width - 2 * Style.space(8)
+    default property alias content: fieldBody.data
+    signal toggled()
+    signal headerHovered()
+
+    bordered: true
+    foreground: root.bar.foreground
+    fill: root.hoverFill
+    implicitHeight: fieldColumn.implicitHeight + 2 * Style.space(6)
+
+    Column {
+      id: fieldColumn
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.margins: Style.space(8)
+      anchors.topMargin: Style.space(6)
+      spacing: Style.space(6)
+
+      Item {
+        width: parent.width
+        implicitHeight: Math.max(fieldSummary.implicitHeight, fieldAction.implicitHeight)
+        opacity: fieldMouse.containsMouse || field.expanded || field.hasCursor ? 1.0 : 0.8
+
+        Text {
+          id: fieldGlyph
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: field.glyph
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.caption
+          width: text ? Style.space(18) : 0
+        }
+
+        Text {
+          id: fieldSummary
+          anchors.left: fieldGlyph.right
+          anchors.right: fieldAction.left
+          anchors.rightMargin: Style.space(8)
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: field.summary
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+
+        Text {
+          id: fieldAction
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: (field.actionText ? field.actionText + " " : "") + (field.expanded ? "󰅃" : "󰅀")
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+
+        MouseArea {
+          id: fieldMouse
+          anchors.fill: parent
+          anchors.margins: -Style.space(6)
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onContainsMouseChanged: if (containsMouse) field.headerHovered()
+          onClicked: field.toggled()
+        }
+      }
+
+      Rectangle {
+        visible: field.expanded
+        width: parent.width
+        height: 1
+        color: Util.alpha(root.bar.foreground, 0.15)
+      }
+
+      Column {
+        id: fieldBody
+        visible: field.expanded
+        width: parent.width
+        spacing: Style.space(3)
+      }
     }
   }
 }

@@ -336,6 +336,16 @@ function streamDisplayName(label, info) {
   return label
 }
 
+// Where the panel should scroll so a cursor row is visible. Rows already in
+// view leave the position alone, so a small overflow can still be scrolled
+// by hand. r: { top, bottom, viewTop, viewHeight, maxY, margin }.
+function scrollTargetFor(r) {
+  if (r.top < r.viewTop + r.margin) return Math.max(0, Math.min(r.maxY, r.top - r.margin))
+  if (r.bottom > r.viewTop + r.viewHeight - r.margin)
+    return Math.max(0, Math.min(r.maxY, r.bottom + r.margin - r.viewHeight))
+  return r.viewTop
+}
+
 // The output a pin should use: the one chosen for the stream, or else the one
 // it is playing on now. info is a parseStreams entry.
 function pinTarget(info) {
@@ -382,6 +392,7 @@ if (typeof module !== "undefined") {
     streamTitles: streamTitles,
     streamDisplayName: streamDisplayName,
     routeSummary: routeSummary,
-    pinTarget: pinTarget
+    pinTarget: pinTarget,
+    scrollTargetFor: scrollTargetFor
   }
 }

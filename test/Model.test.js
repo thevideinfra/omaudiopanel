@@ -79,3 +79,14 @@ test("streamTitles accepts Quickshell's array-like player list", () => {
   const titles = M.streamTitles([{ id: "71", app: "Brave", paused: false }], players)
   assert.equal(titles["71"].title, "Houston vs Texas Tech")
 })
+
+test("scrollTargetFor leaves a visible row alone even when the scroll range is tiny", () => {
+  // 27px of overflow, scrolled to the bottom, cursor lands on a row that is in view.
+  assert.equal(M.scrollTargetFor({ top: 700, bottom: 740, viewTop: 27, viewHeight: 851, maxY: 27, margin: 6 }), 27)
+})
+
+test("scrollTargetFor scrolls just enough to reveal a row above or below the view", () => {
+  assert.equal(M.scrollTargetFor({ top: 10, bottom: 50, viewTop: 100, viewHeight: 400, maxY: 600, margin: 6 }), 4)
+  assert.equal(M.scrollTargetFor({ top: 520, bottom: 560, viewTop: 100, viewHeight: 400, maxY: 600, margin: 6 }), 166)
+  assert.equal(M.scrollTargetFor({ top: 900, bottom: 990, viewTop: 100, viewHeight: 400, maxY: 600, margin: 6 }), 596)
+})
