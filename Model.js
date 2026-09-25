@@ -346,6 +346,21 @@ function scrollTargetFor(r) {
   return r.viewTop
 }
 
+// Heights (0..1) for the three "playing" bars, from a PipeWire peak level
+// and an animation phase that advances while the panel is open. Silence
+// flattens them; otherwise each bar swings on its own offset so they read
+// as an equalizer, and louder audio makes all of them taller.
+function eqBarLevels(peak, phase) {
+  if (!(peak >= 0.01)) return [0, 0, 0]
+  var base = Math.min(1, Math.sqrt(peak) * 1.3)
+  var bars = []
+  for (var i = 0; i < 3; i++) {
+    var swing = 0.5 + 0.5 * Math.abs(Math.sin(phase + i * 2.1))
+    bars.push(Math.max(0.15, Math.min(1, base * swing)))
+  }
+  return bars
+}
+
 // The output a pin should use: the one chosen for the stream, or else the one
 // it is playing on now. info is a parseStreams entry.
 function pinTarget(info) {
@@ -393,6 +408,7 @@ if (typeof module !== "undefined") {
     streamDisplayName: streamDisplayName,
     routeSummary: routeSummary,
     pinTarget: pinTarget,
-    scrollTargetFor: scrollTargetFor
+    scrollTargetFor: scrollTargetFor,
+    eqBarLevels: eqBarLevels
   }
 }

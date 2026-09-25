@@ -773,6 +773,22 @@ Panel {
     enabled: root.opened && !!root.source
   }
 
+  // Drives the "playing" bars next to OUTPUT; the per-app bars have their own.
+  PwNodePeakMonitor {
+    id: outputPeakMonitor
+    node: root.volumeSink
+    enabled: root.opened && !!root.volumeSink
+  }
+
+  // Animation phase shared by every EqBars, advanced only while open.
+  property real eqPhase: 0
+  Timer {
+    interval: 90
+    running: root.opened
+    repeat: true
+    onTriggered: root.eqPhase = (root.eqPhase + 0.55) % (Math.PI * 2)
+  }
+
   Process {
     id: sinkAvailabilityProc
     command: ["omarchy-audio-sink-availability"]
@@ -1066,6 +1082,13 @@ Panel {
                 anchors.verticalCenter: parent.verticalCenter
               }
 
+              EqBars {
+                peak: outputPeakMonitor.peak
+                anchors.left: outputHeader.right
+                anchors.leftMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
               Text {
                 id: outputPercent
                 textFormat: Text.PlainText
@@ -1093,6 +1116,8 @@ Panel {
               PanelSlider {
                 id: outputSlider
                 bar: root.bar
+                fillColor: Color.accent
+                knobColor: Color.accent
                 anchors.fill: parent
                 anchors.leftMargin: Style.space(6)
                 anchors.rightMargin: Style.space(6)
@@ -1188,6 +1213,8 @@ Panel {
                 PanelSlider {
                   id: inputSlider
                   bar: root.bar
+                  fillColor: Color.accent
+                  knobColor: Color.accent
                   width: parent.width
                   minimum: 0
                   maximum: 1
@@ -1209,7 +1236,7 @@ Panel {
                   Rectangle {
                     height: parent.height
                     width: parent.width * Math.max(0, Math.min(1, inputPeakMonitor.peak))
-                    color: root.bar.foreground
+                    color: Color.accent
                     Behavior on width { NumberAnimation { duration: 70 } }
                   }
                 }
@@ -1354,7 +1381,7 @@ Panel {
                   readonly property bool chosen: root.scrollStep === modelData
                   textFormat: Text.PlainText
                   text: modelData + "%"
-                  color: root.bar.foreground
+                  color: chosen ? Color.accent : root.bar.foreground
                   font.family: root.bar.fontFamily
                   font.pixelSize: Style.font.caption
                   font.bold: chosen
@@ -1388,6 +1415,18 @@ Panel {
     required property int rowIndex
 
     readonly property bool isActive: root.sink && node && root.sink.id === node.id
+
+    // Accent stripe marking the device in use.
+    Rectangle {
+      visible: sinkRow.isActive
+      anchors.left: parent.left
+      anchors.leftMargin: Style.space(2)
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(2, Style.space(3))
+      height: parent.height * 0.55
+      radius: width / 2
+      color: Color.accent
+    }
     hasCursor: root.cursorActive && root.focusSection === "output" && root.selectedIndex === rowIndex
     onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(sinkRow)
     current: isActive
@@ -1458,6 +1497,18 @@ Panel {
     required property int rowIndex
 
     readonly property bool isActive: root.source && node && root.source.id === node.id
+
+    // Accent stripe marking the device in use.
+    Rectangle {
+      visible: sourceRow.isActive
+      anchors.left: parent.left
+      anchors.leftMargin: Style.space(2)
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(2, Style.space(3))
+      height: parent.height * 0.55
+      radius: width / 2
+      color: Color.accent
+    }
     hasCursor: root.cursorActive && root.focusSection === "input" && root.selectedIndex === rowIndex
     onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(sourceRow)
     current: isActive
@@ -1531,6 +1582,12 @@ Panel {
     required property int rowIndex
 
     readonly property real streamVolume: node && node.audio ? node.audio.volume : 0
+
+    PwNodePeakMonitor {
+      id: streamPeak
+      node: streamRow.node
+      enabled: root.opened && !!streamRow.node
+    }
     readonly property bool streamMuted: node && node.audio ? node.audio.muted : false
     readonly property bool isActive: root.streamRepresentsPlayer(node, root.activeMediaPlayer)
 
@@ -1596,6 +1653,13 @@ Panel {
           font.bold: streamRow.isActive
           elide: Text.ElideRight
           width: parent.width - streamMuteIcon.width - streamPct.width - Style.space(16)
+            - (streamEq.visible ? streamEq.width + Style.space(8) : 0)
+          anchors.verticalCenter: parent.verticalCenter
+        }
+
+        EqBars {
+          id: streamEq
+          peak: streamPeak.peak
           anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -1621,6 +1685,8 @@ Panel {
         maximum: 1.5
         step: root.scrollStep / 100
         value: streamRow.streamVolume
+        fillColor: Color.accent
+        knobColor: Color.accent
         opacity: streamRow.streamMuted ? 0.5 : 1.0
 
         onMoved: function(v) {
@@ -1668,7 +1734,7 @@ Panel {
                 + (modelData.sink
                   ? root.nodeLabel(modelData.sink)
                   : "Default output (" + root.nodeLabel(root.sink) + ")")
-              color: choiceMouse.containsMouse || chosen ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25)
+              color: chosen ? Color.accent : (choiceMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.caption
               font.bold: chosen
@@ -1697,7 +1763,7 @@ Panel {
             textFormat: Text.PlainText
             text: (checked ? "󰄲  " : "󰄱  ") + "Always play " + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node))
               + " on " + root.sinkLabelFor(targetName)
-            color: pinMouse.containsMouse || checked ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25)
+            color: checked ? Color.accent : (pinMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.caption
             font.bold: checked
@@ -1934,6 +2000,33 @@ Panel {
         visible: field.expanded
         width: parent.width
         spacing: Style.space(3)
+      }
+    }
+  }
+
+  // Three accent bars that move with a PipeWire peak level, in the spirit of
+  // a "now playing" equalizer. Hidden while silent.
+  component EqBars: Row {
+    id: eq
+    property real peak: 0
+    readonly property var levels: Model.eqBarLevels(peak, root.eqPhase)
+    readonly property real barHeight: Math.round(Style.font.caption * 0.9)
+
+    visible: levels[0] > 0
+    spacing: Math.max(1, Style.space(2))
+    height: barHeight
+
+    Repeater {
+      model: 3
+
+      Rectangle {
+        required property int index
+        anchors.bottom: parent.bottom
+        width: Math.max(2, Style.space(3))
+        height: Math.max(2, eq.barHeight * eq.levels[index])
+        radius: width / 2
+        color: Color.accent
+        Behavior on height { NumberAnimation { duration: 90 } }
       }
     }
   }

@@ -90,3 +90,21 @@ test("scrollTargetFor scrolls just enough to reveal a row above or below the vie
   assert.equal(M.scrollTargetFor({ top: 520, bottom: 560, viewTop: 100, viewHeight: 400, maxY: 600, margin: 6 }), 166)
   assert.equal(M.scrollTargetFor({ top: 900, bottom: 990, viewTop: 100, viewHeight: 400, maxY: 600, margin: 6 }), 596)
 })
+
+test("eqBarLevels is flat when silent", () => {
+  assert.deepEqual(M.eqBarLevels(0, 0), [0, 0, 0])
+  assert.deepEqual(M.eqBarLevels(0.005, 1.3), [0, 0, 0])
+})
+
+test("eqBarLevels gives three distinct visible heights while playing", () => {
+  const bars = M.eqBarLevels(0.3, 0.7)
+  assert.equal(bars.length, 3)
+  for (const h of bars) assert.ok(h >= 0.15 && h <= 1, `height ${h} out of range`)
+  assert.ok(new Set(bars.map(h => h.toFixed(3))).size > 1, "bars should not all match")
+})
+
+test("eqBarLevels grows with the level at the same phase", () => {
+  const quiet = M.eqBarLevels(0.05, 2)
+  const loud = M.eqBarLevels(0.6, 2)
+  for (let i = 0; i < 3; i++) assert.ok(loud[i] >= quiet[i])
+})
