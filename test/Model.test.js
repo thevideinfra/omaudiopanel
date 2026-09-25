@@ -108,3 +108,28 @@ test("eqBarLevels grows with the level at the same phase", () => {
   const loud = M.eqBarLevels(0.6, 2)
   for (let i = 0; i < 3; i++) assert.ok(loud[i] >= quiet[i])
 })
+
+test("densityScale shrinks from comfortable to compact and defaults to normal", () => {
+  const c = M.densityScale("compact"), n = M.densityScale("normal"), f = M.densityScale("comfortable")
+  assert.equal(f, 1)
+  assert.ok(c < n && n < f)
+  assert.equal(M.densityScale("bogus"), n)
+  assert.equal(M.densityScale(undefined), n)
+})
+
+test("settingBool reads booleans and their string forms with a fallback", () => {
+  assert.equal(M.settingBool(true, false), true)
+  assert.equal(M.settingBool("false", true), false)
+  assert.equal(M.settingBool("true", false), true)
+  assert.equal(M.settingBool(undefined, true), true)
+  assert.equal(M.settingBool(null, false), false)
+})
+
+test("eqBarLevels keeps quiet audio clearly visible", () => {
+  // Speech often peaks around 0.05; the bars should still read as bars.
+  for (const phase of [0, 0.7, 1.9, 3.1]) {
+    const bars = M.eqBarLevels(0.05, phase)
+    assert.ok(Math.max(...bars) >= 0.5, `tallest bar ${Math.max(...bars)} at phase ${phase}`)
+    for (const h of bars) assert.ok(h >= 0.3, `bar ${h} too short at phase ${phase}`)
+  }
+})

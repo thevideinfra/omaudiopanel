@@ -19,13 +19,59 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "scrollStep": 5
+      "scrollStep": 5,
+      "density": "normal",
+      "showPlayingBars": true,
+      "showRouting": true,
+      "showDisabled": true,
+      "showStepFooter": true
     },
     "schema": [
       {
+        "key": "density",
+        "type": "enum",
+        "label": "Density",
+        "options": [
+          "compact",
+          "normal",
+          "comfortable"
+        ],
+        "defaultValue": "normal",
+        "description": "How tightly the panel is laid out."
+      },
+      {
         "key": "scrollStep",
-        "type": "number",
-        "label": "Volume step (%) for scrolling, sliders and volume keys"
+        "type": "integer",
+        "label": "Volume step (%)",
+        "min": 1,
+        "max": 25,
+        "step": 1,
+        "defaultValue": 5,
+        "description": "Per scroll notch, slider step, h/l in the panel and (with the optional binding) the volume keys."
+      },
+      {
+        "key": "showPlayingBars",
+        "type": "boolean",
+        "label": "Show playing bars",
+        "defaultValue": true
+      },
+      {
+        "key": "showRouting",
+        "type": "boolean",
+        "label": "Show the output field under each app",
+        "defaultValue": true
+      },
+      {
+        "key": "showDisabled",
+        "type": "boolean",
+        "label": "Show the Disabled devices section",
+        "defaultValue": true
+      },
+      {
+        "key": "showStepFooter",
+        "type": "boolean",
+        "label": "Show the volume step footer",
+        "defaultValue": true
       }
     ]
   },

@@ -352,13 +352,30 @@ function scrollTargetFor(r) {
 // as an equalizer, and louder audio makes all of them taller.
 function eqBarLevels(peak, phase) {
   if (!(peak >= 0.01)) return [0, 0, 0]
-  var base = Math.min(1, Math.sqrt(peak) * 1.3)
+  // A floor under the level keeps speech-level audio readable as bars.
+  var base = Math.min(1, 0.45 + Math.sqrt(peak) * 1.1)
   var bars = []
   for (var i = 0; i < 3; i++) {
     var swing = 0.5 + 0.5 * Math.abs(Math.sin(phase + i * 2.1))
-    bars.push(Math.max(0.15, Math.min(1, base * swing)))
+    bars.push(Math.max(0.3, Math.min(1, base * swing)))
   }
   return bars
+}
+
+// Size multiplier for the panel's own spacing, fonts and width.
+// Comfortable is the stock size; normal is the default.
+function densityScale(name) {
+  if (name === "compact") return 0.76
+  if (name === "comfortable") return 1
+  return 0.88
+}
+
+// shell.json values may arrive as real booleans or as "true"/"false" strings
+// (omarchy bar set without --json).
+function settingBool(value, fallback) {
+  if (value === true || value === "true") return true
+  if (value === false || value === "false") return false
+  return fallback
 }
 
 // The output a pin should use: the one chosen for the stream, or else the one
@@ -409,6 +426,8 @@ if (typeof module !== "undefined") {
     routeSummary: routeSummary,
     pinTarget: pinTarget,
     scrollTargetFor: scrollTargetFor,
-    eqBarLevels: eqBarLevels
+    eqBarLevels: eqBarLevels,
+    densityScale: densityScale,
+    settingBool: settingBool
   }
 }

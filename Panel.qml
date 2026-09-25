@@ -121,6 +121,30 @@ Panel {
   // selected while a tuning still exists.
   property string volumeSinkName: ""
 
+  // ---- Display settings (shell.json, set from the gear view) ----
+  readonly property string density: String(setting("density", "normal"))
+  readonly property real densityScale: Model.densityScale(density)
+  // Text shrinks half as fast as spacing so compact stays readable.
+  readonly property real fontScale: 0.5 + 0.5 * densityScale
+  readonly property real fontTitle: Math.round(Style.font.title * fontScale)
+  readonly property real fontBody: Math.round(Style.font.body * fontScale)
+  readonly property real fontCaption: Math.max(9, Math.round(Style.font.caption * fontScale))
+  readonly property real fontDisplay: Math.round(Style.font.display * fontScale)
+  readonly property bool showPlayingBars: Model.settingBool(setting("showPlayingBars", true), true)
+  readonly property bool showRouting: Model.settingBool(setting("showRouting", true), true)
+  readonly property bool showDisabled: Model.settingBool(setting("showDisabled", true), true)
+  readonly property bool showStepFooter: Model.settingBool(setting("showStepFooter", true), true)
+  property bool settingsOpen: false
+
+  // Style.space scaled by the chosen density.
+  function sp(px) {
+    return Style.space(px * densityScale)
+  }
+
+  function setSetting(key, value) {
+    Quickshell.execDetached(["omarchy", "bar", "set", "videinfra.omaudiopanel", key, JSON.stringify(value), "--json"])
+  }
+
   // Carry sub-notch touchpad deltas between wheel events.
   property real wheelAccumulator: 0
 
@@ -333,6 +357,7 @@ Panel {
       refreshHelperState()
       expandedStreamId = -1
       disabledExpanded = false
+      settingsOpen = false
       focusSection = "output"
       selectedIndex = -1  // first keyboard cursor reveal starts on the output slider
       cursorActive = false
@@ -391,7 +416,7 @@ Panel {
     var flick = scrollArea.contentItem
     if (!flick || flick.contentY === undefined) return
     // Stock snapped to the top whenever the overflow was under
-    // Style.space(24), or whenever the cursor touched the output slider.
+    // root.sp(24), or whenever the cursor touched the output slider.
     // Hover handlers pass through the output slider on their way to a row,
     // and this panel's extra sections overflow only a little, so both made
     // the footer unreachable. Only move when the row is out of view.
@@ -777,14 +802,14 @@ Panel {
   PwNodePeakMonitor {
     id: outputPeakMonitor
     node: root.volumeSink
-    enabled: root.opened && !!root.volumeSink
+    enabled: root.opened && root.showPlayingBars && !!root.volumeSink
   }
 
   // Animation phase shared by every EqBars, advanced only while open.
   property real eqPhase: 0
   Timer {
     interval: 90
-    running: root.opened
+    running: root.opened && root.showPlayingBars
     repeat: true
     onTriggered: root.eqPhase = (root.eqPhase + 0.55) % (Math.PI * 2)
   }
@@ -922,8 +947,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(760))
+    contentWidth: panel.fittedContentWidth(root.sp(380))
+    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, root.sp(760))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -982,7 +1007,7 @@ Panel {
         Column {
           id: panelColumn
           width: scrollArea.availableWidth
-          spacing: Style.space(14)
+          spacing: root.sp(14)
 
           // ---------- Hero: speaker icon · title/status ----------
           Item {
@@ -997,7 +1022,7 @@ Panel {
               text: root.outputIcon()
               color: root.bar.foreground
               font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.display
+              font.pixelSize: root.fontDisplay
               opacity: root.outputMuted ? 0.5 : 1.0
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
@@ -1023,20 +1048,52 @@ Panel {
               }
             }
 
+            // Opens the settings view in place of the panel content.
+            Text {
+              id: gearButton
+              anchors.right: powerSwitch.left
+              anchors.rightMargin: root.sp(12)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: root.settingsOpen ? "󰅖" : "󰒓"
+              color: root.settingsOpen ? Color.accent : root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: root.fontTitle
+              opacity: gearMouse.containsMouse || root.settingsOpen ? 1.0 : 0.6
+
+              MouseArea {
+                id: gearMouse
+                anchors.fill: parent
+                anchors.margins: -root.sp(4)
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  root.settingsOpen = !root.settingsOpen
+                  root.cursorActive = false
+                }
+              }
+
+              PanelToolTip {
+                visible: gearMouse.containsMouse
+                text: root.settingsOpen ? "Close settings" : "Panel settings"
+                fontFamily: root.bar.fontFamily
+              }
+            }
+
             Column {
               id: heroLabels
               anchors.left: heroIcon.right
-              anchors.leftMargin: Style.space(14)
+              anchors.leftMargin: root.sp(14)
               anchors.right: parent.right
-              anchors.rightMargin: powerSwitch.width + Style.space(12)
+              anchors.rightMargin: powerSwitch.width + gearButton.width + root.sp(24)
               anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(2)
+              spacing: root.sp(2)
 
               Text {
                 text: "Audio"
                 color: root.bar.foreground
                 font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.title
+                font.pixelSize: root.fontTitle
                 font.bold: true
                 elide: Text.ElideRight
                 width: parent.width
@@ -1051,7 +1108,7 @@ Panel {
                 ).toUpperCase()
                 color: Qt.darker(root.bar.foreground, 1.4)
                 font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: root.fontCaption
                 font.bold: true
                 font.letterSpacing: 1.2
                 elide: Text.ElideRight
@@ -1060,344 +1117,336 @@ Panel {
             }
           }
 
-          // ---- Output devices ----
-          PanelSeparator {
-            foreground: root.bar.foreground
-          }
-
+          // Everything below the header; the gear swaps it for the settings view.
           Column {
+            id: mainView
             width: parent.width
-            spacing: Style.space(6)
+            spacing: root.sp(14)
+            visible: !root.settingsOpen
 
-            Item {
-              width: parent.width
-              implicitHeight: Math.max(outputHeader.implicitHeight, outputPercent.implicitHeight)
-
-              PanelSectionHeader {
-                id: outputHeader
-                text: "OUTPUT"
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              EqBars {
-                peak: outputPeakMonitor.peak
-                anchors.left: outputHeader.right
-                anchors.leftMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Text {
-                id: outputPercent
-                textFormat: Text.PlainText
-                text: Math.round((outputSlider.dragging ? outputSlider.liveValue : root.outputVolume) * 100) + "%"
-                color: Qt.darker(root.bar.foreground, 1.4)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-                opacity: root.outputMuted ? 0.5 : 1.0
-              }
+            // ---- Output devices ----
+            PanelSeparator {
+              foreground: root.bar.foreground
             }
 
-            CursorSurface {
-              id: outputSliderRow
+            Column {
               width: parent.width
-              height: outputSlider.implicitHeight + Style.spacing.controlGap
-              hasCursor: root.cursorActive && root.focusSection === "output" && root.selectedIndex === -1
-              onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(outputSliderRow)
-              foreground: root.bar.foreground
-              outline: true
+              spacing: root.sp(6)
 
-              PanelSlider {
-                id: outputSlider
-                bar: root.bar
-                fillColor: Color.accent
-                knobColor: Color.accent
-                anchors.fill: parent
-                anchors.leftMargin: Style.space(6)
-                anchors.rightMargin: Style.space(6)
-                minimum: 0
-                maximum: 1
-                step: root.scrollStep / 100
-                value: root.outputVolume
-                opacity: root.outputMuted ? 0.5 : 1.0
-                enabled: !!root.sink
+              Item {
+                width: parent.width
+                implicitHeight: Math.max(outputHeader.implicitHeight, outputPercent.implicitHeight)
 
-                onMoved: function(v) { root.setOutputVolume(v) }
-                onRightClicked: root.toggleOutputMute()
-              }
+                PanelSectionHeader {
+                  id: outputHeader
+                  text: "OUTPUT"
+                  foreground: root.bar.foreground
+                  fontFamily: root.bar.fontFamily
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                }
 
-              HoverHandler {
-                onHoveredChanged: if (hovered) {
-                  root.cursorActive = true
-                  root.focusSection = "output"
-                  root.selectedIndex = -1
+                EqBars {
+                  peak: outputPeakMonitor.peak
+                  anchors.left: outputHeader.right
+                  anchors.leftMargin: root.sp(8)
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                  id: outputPercent
+                  textFormat: Text.PlainText
+                  text: Math.round((outputSlider.dragging ? outputSlider.liveValue : root.outputVolume) * 100) + "%"
+                  color: Qt.darker(root.bar.foreground, 1.4)
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: root.fontCaption
+                  font.bold: true
+                  anchors.right: parent.right
+                  anchors.rightMargin: root.sp(6)
+                  anchors.verticalCenter: parent.verticalCenter
+                  opacity: root.outputMuted ? 0.5 : 1.0
                 }
               }
-            }
 
-            Repeater {
-              model: root.displayAudioSinks
-
-              SinkRow {
-                required property var modelData
-                required property int index
-                width: panelColumn.width
-                node: modelData
-                rowIndex: index
-              }
-            }
-          }
-
-          // ---- Input ----
-          PanelSeparator {
-            visible: root.displayAudioSources.length > 0 || !!root.source
-            foreground: root.bar.foreground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(6)
-            visible: root.displayAudioSources.length > 0 || !!root.source
-
-            Item {
-              width: parent.width
-              implicitHeight: Math.max(microphoneHeader.implicitHeight, microphonePercent.implicitHeight)
-
-              PanelSectionHeader {
-                id: microphoneHeader
-                text: "INPUT"
+              CursorSurface {
+                id: outputSliderRow
+                width: parent.width
+                height: outputSlider.implicitHeight + (Style.spacing.controlGap * root.densityScale)
+                hasCursor: root.cursorActive && root.focusSection === "output" && root.selectedIndex === -1
+                onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(outputSliderRow)
                 foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Text {
-                id: microphonePercent
-                textFormat: Text.PlainText
-                text: Math.round((inputSlider.dragging ? inputSlider.liveValue : root.inputVolume) * 100) + "%"
-                color: Qt.darker(root.bar.foreground, 1.4)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-                opacity: root.inputMuted ? 0.5 : 1.0
-              }
-            }
-
-            CursorSurface {
-              id: inputSliderRow
-              visible: !!root.source
-              width: parent.width
-              height: inputControls.implicitHeight + Style.spacing.controlGap
-              hasCursor: root.cursorActive && root.focusSection === "input" && root.selectedIndex === -1
-              onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(inputSliderRow)
-              foreground: root.bar.foreground
-              outline: true
-
-              Column {
-                id: inputControls
-                anchors.fill: parent
-                anchors.leftMargin: Style.space(6)
-                anchors.rightMargin: Style.space(6)
-                spacing: Style.space(5)
+                outline: true
 
                 PanelSlider {
-                  id: inputSlider
+                  id: outputSlider
                   bar: root.bar
                   fillColor: Color.accent
                   knobColor: Color.accent
-                  width: parent.width
+                  anchors.fill: parent
+                  anchors.leftMargin: root.sp(6)
+                  anchors.rightMargin: root.sp(6)
                   minimum: 0
                   maximum: 1
                   step: root.scrollStep / 100
-                  value: root.inputVolume
-                  opacity: root.inputMuted ? 0.5 : 1.0
-                  enabled: !!root.source
+                  value: root.outputVolume
+                  opacity: root.outputMuted ? 0.5 : 1.0
+                  enabled: !!root.sink
 
-                  onMoved: function(v) { root.setInputVolume(v) }
-                  onRightClicked: root.toggleInputMute()
+                  onMoved: function(v) { root.setOutputVolume(v) }
+                  onRightClicked: root.toggleOutputMute()
                 }
 
-                Rectangle {
-                  width: parent.width
-                  height: Math.max(Style.space(5), Style.spacing.xs)
-                  color: Util.alpha(root.bar.foreground, 0.18)
-                  opacity: root.inputMuted ? 0.35 : 1.0
-
-                  Rectangle {
-                    height: parent.height
-                    width: parent.width * Math.max(0, Math.min(1, inputPeakMonitor.peak))
-                    color: Color.accent
-                    Behavior on width { NumberAnimation { duration: 70 } }
+                HoverHandler {
+                  onHoveredChanged: if (hovered) {
+                    root.cursorActive = true
+                    root.focusSection = "output"
+                    root.selectedIndex = -1
                   }
                 }
               }
 
-              HoverHandler {
-                onHoveredChanged: if (hovered) {
-                  root.cursorActive = true
-                  root.focusSection = "input"
-                  root.selectedIndex = -1
-                }
-              }
-            }
-
-            Repeater {
-              model: root.displayAudioSources
-
-              SourceRow {
-                required property var modelData
-                required property int index
-                width: panelColumn.width
-                node: modelData
-                rowIndex: index
-              }
-            }
-          }
-
-          // ---- Per-app streams ----
-          PanelSeparator {
-            visible: root.displayAudioStreams.length > 0
-            foreground: root.bar.foreground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(10)
-            visible: root.displayAudioStreams.length > 0
-
-            PanelSectionHeader {
-              text: "SOURCES"
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-            }
-
-            Repeater {
-              model: root.displayAudioStreams
-
-              StreamRow {
-                required property var modelData
-                required property int index
-                width: panelColumn.width
-                node: modelData
-                rowIndex: index
-              }
-            }
-          }
-
-          // ---- Disabled devices ----
-          PanelSeparator {
-            visible: root.disabledDevices.length > 0
-            foreground: root.bar.foreground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(6)
-            visible: root.disabledDevices.length > 0
-
-            PanelSectionHeader {
-              text: "DISABLED"
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-            }
-
-            // Collapsed by default: the devices matter only when turning one
-            // back on.
-            DropdownField {
-              id: disabledField
-              width: parent.width
-              glyph: "󰐥"
-              summary: root.disabledDevices.length === 1
-                ? "1 device turned off"
-                : root.disabledDevices.length + " devices turned off"
-              actionText: root.disabledExpanded ? "Hide" : "Show"
-              expanded: root.disabledExpanded
-              hasCursor: root.cursorActive && root.focusSection === "disabled" && root.selectedIndex === -1
-              onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(disabledField)
-              onToggled: root.disabledExpanded = !root.disabledExpanded
-              onHeaderHovered: {
-                root.cursorActive = true
-                root.focusSection = "disabled"
-                root.selectedIndex = -1
-              }
-
               Repeater {
-                model: root.disabledExpanded ? root.disabledDevices : []
+                model: root.displayAudioSinks
 
-                DisabledRow {
+                SinkRow {
                   required property var modelData
                   required property int index
-                  width: disabledField.bodyWidth
-                  entry: modelData
+                  width: panelColumn.width
+                  node: modelData
                   rowIndex: index
                 }
               }
             }
-          }
 
-          // ---- Scroll step ----
-          PanelSeparator {
-            foreground: root.bar.foreground
-          }
-
-          Item {
-            width: parent.width
-            implicitHeight: Math.max(scrollStepLabel.implicitHeight, scrollStepChips.implicitHeight)
-
-            Text {
-              id: scrollStepLabel
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-              textFormat: Text.PlainText
-              text: "Volume step (scroll, keys)"
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-              elide: Text.ElideRight
-              width: parent.width - scrollStepChips.width - Style.space(8)
+            // ---- Input ----
+            PanelSeparator {
+              visible: root.displayAudioSources.length > 0 || !!root.source
+              foreground: root.bar.foreground
             }
 
-            Row {
-              id: scrollStepChips
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(8)
+            Column {
+              width: parent.width
+              spacing: root.sp(6)
+              visible: root.displayAudioSources.length > 0 || !!root.source
 
-              Repeater {
-                model: root.scrollStepChoices
+              Item {
+                width: parent.width
+                implicitHeight: Math.max(microphoneHeader.implicitHeight, microphonePercent.implicitHeight)
+
+                PanelSectionHeader {
+                  id: microphoneHeader
+                  text: "INPUT"
+                  foreground: root.bar.foreground
+                  fontFamily: root.bar.fontFamily
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                }
 
                 Text {
-                  required property var modelData
-                  readonly property bool chosen: root.scrollStep === modelData
+                  id: microphonePercent
                   textFormat: Text.PlainText
-                  text: modelData + "%"
-                  color: chosen ? Color.accent : root.bar.foreground
+                  text: Math.round((inputSlider.dragging ? inputSlider.liveValue : root.inputVolume) * 100) + "%"
+                  color: Qt.darker(root.bar.foreground, 1.4)
                   font.family: root.bar.fontFamily
-                  font.pixelSize: Style.font.caption
-                  font.bold: chosen
-                  font.underline: chosen
-                  opacity: chosen || stepMouse.containsMouse ? 1.0 : 0.5
+                  font.pixelSize: root.fontCaption
+                  font.bold: true
+                  anchors.right: parent.right
+                  anchors.rightMargin: root.sp(6)
+                  anchors.verticalCenter: parent.verticalCenter
+                  opacity: root.inputMuted ? 0.5 : 1.0
+                }
+              }
 
-                  MouseArea {
-                    id: stepMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.setScrollStep(parent.modelData)
+              CursorSurface {
+                id: inputSliderRow
+                visible: !!root.source
+                width: parent.width
+                height: inputControls.implicitHeight + (Style.spacing.controlGap * root.densityScale)
+                hasCursor: root.cursorActive && root.focusSection === "input" && root.selectedIndex === -1
+                onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(inputSliderRow)
+                foreground: root.bar.foreground
+                outline: true
+
+                Column {
+                  id: inputControls
+                  anchors.fill: parent
+                  anchors.leftMargin: root.sp(6)
+                  anchors.rightMargin: root.sp(6)
+                  spacing: root.sp(5)
+
+                  PanelSlider {
+                    id: inputSlider
+                    bar: root.bar
+                    fillColor: Color.accent
+                    knobColor: Color.accent
+                    width: parent.width
+                    minimum: 0
+                    maximum: 1
+                    step: root.scrollStep / 100
+                    value: root.inputVolume
+                    opacity: root.inputMuted ? 0.5 : 1.0
+                    enabled: !!root.source
+
+                    onMoved: function(v) { root.setInputVolume(v) }
+                    onRightClicked: root.toggleInputMute()
+                  }
+
+                  Rectangle {
+                    width: parent.width
+                    height: Math.max(root.sp(5), (Style.spacing.xs * root.densityScale))
+                    color: Util.alpha(root.bar.foreground, 0.18)
+                    opacity: root.inputMuted ? 0.35 : 1.0
+
+                    Rectangle {
+                      height: parent.height
+                      width: parent.width * Math.max(0, Math.min(1, inputPeakMonitor.peak))
+                      color: Color.accent
+                      Behavior on width { NumberAnimation { duration: 70 } }
+                    }
+                  }
+                }
+
+                HoverHandler {
+                  onHoveredChanged: if (hovered) {
+                    root.cursorActive = true
+                    root.focusSection = "input"
+                    root.selectedIndex = -1
+                  }
+                }
+              }
+
+              Repeater {
+                model: root.displayAudioSources
+
+                SourceRow {
+                  required property var modelData
+                  required property int index
+                  width: panelColumn.width
+                  node: modelData
+                  rowIndex: index
+                }
+              }
+            }
+
+            // ---- Per-app streams ----
+            PanelSeparator {
+              visible: root.displayAudioStreams.length > 0
+              foreground: root.bar.foreground
+            }
+
+            Column {
+              width: parent.width
+              spacing: root.sp(10)
+              visible: root.displayAudioStreams.length > 0
+
+              PanelSectionHeader {
+                text: "SOURCES"
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+              }
+
+              Repeater {
+                model: root.displayAudioStreams
+
+                StreamRow {
+                  required property var modelData
+                  required property int index
+                  width: panelColumn.width
+                  node: modelData
+                  rowIndex: index
+                }
+              }
+            }
+
+            // ---- Disabled devices ----
+            PanelSeparator {
+              visible: root.showDisabled && root.disabledDevices.length > 0
+              foreground: root.bar.foreground
+            }
+
+            Column {
+              width: parent.width
+              spacing: root.sp(6)
+              visible: root.showDisabled && root.disabledDevices.length > 0
+
+              PanelSectionHeader {
+                text: "DISABLED"
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+              }
+
+              // Collapsed by default: the devices matter only when turning one
+              // back on.
+              DropdownField {
+                id: disabledField
+                width: parent.width
+                glyph: "󰐥"
+                summary: root.disabledDevices.length === 1
+                  ? "1 device turned off"
+                  : root.disabledDevices.length + " devices turned off"
+                actionText: root.disabledExpanded ? "Hide" : "Show"
+                expanded: root.disabledExpanded
+                hasCursor: root.cursorActive && root.focusSection === "disabled" && root.selectedIndex === -1
+                onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(disabledField)
+                onToggled: root.disabledExpanded = !root.disabledExpanded
+                onHeaderHovered: {
+                  root.cursorActive = true
+                  root.focusSection = "disabled"
+                  root.selectedIndex = -1
+                }
+
+                Repeater {
+                  model: root.disabledExpanded ? root.disabledDevices : []
+
+                  DisabledRow {
+                    required property var modelData
+                    required property int index
+                    width: disabledField.bodyWidth
+                    entry: modelData
+                    rowIndex: index
                   }
                 }
               }
             }
+
+            // ---- Scroll step ----
+            PanelSeparator {
+              visible: root.showStepFooter
+              foreground: root.bar.foreground
+            }
+
+            Item {
+              visible: root.showStepFooter
+              width: parent.width
+              implicitHeight: Math.max(scrollStepLabel.implicitHeight, scrollStepChips.implicitHeight)
+
+              Text {
+                id: scrollStepLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: "Volume step (scroll, keys)"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: root.fontCaption
+                elide: Text.ElideRight
+                width: parent.width - scrollStepChips.width - root.sp(8)
+              }
+
+              ChoiceChips {
+                id: scrollStepChips
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                choices: root.scrollStepChoices.map(function(v) { return { value: v, label: v + "%" } })
+                selected: root.scrollStep
+                onPicked: function(value) { root.setScrollStep(value) }
+              }
+            }
+          }
+
+          SettingsView {
+            width: parent.width
+            visible: root.settingsOpen
           }
         }
       }
@@ -1420,9 +1469,9 @@ Panel {
     Rectangle {
       visible: sinkRow.isActive
       anchors.left: parent.left
-      anchors.leftMargin: Style.space(2)
+      anchors.leftMargin: root.sp(2)
       anchors.verticalCenter: parent.verticalCenter
-      width: Math.max(2, Style.space(3))
+      width: Math.max(2, root.sp(3))
       height: parent.height * 0.55
       radius: width / 2
       color: Color.accent
@@ -1433,24 +1482,24 @@ Panel {
     foreground: root.bar.foreground
     fill: root.hoverFill
     currentFill: root.selectedFill
-    implicitHeight: sinkInner.implicitHeight + Style.spacing.xl
+    implicitHeight: sinkInner.implicitHeight + (Style.spacing.xl * root.densityScale)
 
     Row {
       id: sinkInner
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
-      spacing: Style.space(8)
+      anchors.leftMargin: root.sp(6)
+      anchors.rightMargin: root.sp(6)
+      spacing: root.sp(8)
 
       Text {
         textFormat: Text.PlainText
         text: root.sinkGlyph(sinkRow.node)
         color: root.bar.foreground
         font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.title
-        width: Style.space(22)
+        font.pixelSize: root.fontTitle
+        width: root.sp(22)
         horizontalAlignment: Text.AlignHCenter
         anchors.verticalCenter: parent.verticalCenter
       }
@@ -1460,10 +1509,10 @@ Panel {
         text: root.nodeLabel(sinkRow.node)
         color: root.bar.foreground
         font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.body
+        font.pixelSize: root.fontBody
         font.bold: sinkRow.isActive
         elide: Text.ElideRight
-        width: parent.width - 2 * (Style.space(22) + Style.space(8))
+        width: parent.width - 2 * (root.sp(22) + root.sp(8))
         anchors.verticalCenter: parent.verticalCenter
       }
     }
@@ -1485,7 +1534,7 @@ Panel {
       kind: "sink"
       shown: sinkRow.hasCursor
       anchors.right: parent.right
-      anchors.rightMargin: Style.space(6)
+      anchors.rightMargin: root.sp(6)
       anchors.verticalCenter: parent.verticalCenter
     }
   }
@@ -1502,9 +1551,9 @@ Panel {
     Rectangle {
       visible: sourceRow.isActive
       anchors.left: parent.left
-      anchors.leftMargin: Style.space(2)
+      anchors.leftMargin: root.sp(2)
       anchors.verticalCenter: parent.verticalCenter
-      width: Math.max(2, Style.space(3))
+      width: Math.max(2, root.sp(3))
       height: parent.height * 0.55
       radius: width / 2
       color: Color.accent
@@ -1515,24 +1564,24 @@ Panel {
     foreground: root.bar.foreground
     fill: root.hoverFill
     currentFill: root.selectedFill
-    implicitHeight: sourceInner.implicitHeight + Style.spacing.xl
+    implicitHeight: sourceInner.implicitHeight + (Style.spacing.xl * root.densityScale)
 
     Row {
       id: sourceInner
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
-      spacing: Style.space(8)
+      anchors.leftMargin: root.sp(6)
+      anchors.rightMargin: root.sp(6)
+      spacing: root.sp(8)
 
       Text {
         textFormat: Text.PlainText
         text: root.sourceGlyph(sourceRow.node)
         color: root.bar.foreground
         font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.title
-        width: Style.space(22)
+        font.pixelSize: root.fontTitle
+        width: root.sp(22)
         horizontalAlignment: Text.AlignHCenter
         anchors.verticalCenter: parent.verticalCenter
       }
@@ -1542,10 +1591,10 @@ Panel {
         text: root.nodeLabel(sourceRow.node)
         color: root.bar.foreground
         font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.body
+        font.pixelSize: root.fontBody
         font.bold: sourceRow.isActive
         elide: Text.ElideRight
-        width: parent.width - 2 * (Style.space(22) + Style.space(8))
+        width: parent.width - 2 * (root.sp(22) + root.sp(8))
         anchors.verticalCenter: parent.verticalCenter
       }
     }
@@ -1567,7 +1616,7 @@ Panel {
       kind: "source"
       shown: sourceRow.hasCursor
       anchors.right: parent.right
-      anchors.rightMargin: Style.space(6)
+      anchors.rightMargin: root.sp(6)
       anchors.verticalCenter: parent.verticalCenter
     }
   }
@@ -1586,7 +1635,7 @@ Panel {
     PwNodePeakMonitor {
       id: streamPeak
       node: streamRow.node
-      enabled: root.opened && !!streamRow.node
+      enabled: root.opened && root.showPlayingBars && !!streamRow.node
     }
     readonly property bool streamMuted: node && node.audio ? node.audio.muted : false
     readonly property bool isActive: root.streamRepresentsPlayer(node, root.activeMediaPlayer)
@@ -1607,20 +1656,20 @@ Panel {
     foreground: root.bar.foreground
     fill: root.hoverFill
     currentFill: root.selectedFill
-    implicitHeight: streamColumn.implicitHeight + Style.spacing.xl
+    implicitHeight: streamColumn.implicitHeight + (Style.spacing.xl * root.densityScale)
 
     Column {
       id: streamColumn
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
-      spacing: Style.space(2)
+      anchors.leftMargin: root.sp(6)
+      anchors.rightMargin: root.sp(6)
+      spacing: root.sp(2)
 
       Row {
         width: parent.width
-        spacing: Style.space(8)
+        spacing: root.sp(8)
 
         Text {
           id: streamMuteIcon
@@ -1628,8 +1677,8 @@ Panel {
           text: streamRow.streamMuted ? "󰝟" : "󰕾"
           color: root.bar.foreground
           font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.title
-          width: Style.space(22)
+          font.pixelSize: root.fontTitle
+          width: root.sp(22)
           horizontalAlignment: Text.AlignHCenter
           anchors.verticalCenter: parent.verticalCenter
           opacity: streamRow.streamMuted ? 0.5 : 1.0
@@ -1649,11 +1698,11 @@ Panel {
           text: root.streamDisplayName(streamRow.node)
           color: root.bar.foreground
           font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: root.fontBody
           font.bold: streamRow.isActive
           elide: Text.ElideRight
-          width: parent.width - streamMuteIcon.width - streamPct.width - Style.space(16)
-            - (streamEq.visible ? streamEq.width + Style.space(8) : 0)
+          width: parent.width - streamMuteIcon.width - streamPct.width - root.sp(16)
+            - (streamEq.visible ? streamEq.width + root.sp(8) : 0)
           anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -1669,9 +1718,9 @@ Panel {
           text: Math.round(streamRow.streamVolume * 100) + "%"
           color: Qt.darker(root.bar.foreground, 1.5)
           font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.fontCaption
           font.bold: true
-          width: Style.space(36)
+          width: root.sp(36)
           horizontalAlignment: Text.AlignRight
           anchors.verticalCenter: parent.verticalCenter
           opacity: streamRow.streamMuted ? 0.5 : 1.0
@@ -1700,6 +1749,7 @@ Panel {
 
       // Where this app plays, as a field that opens to the output choices.
       DropdownField {
+        visible: root.showRouting
         width: parent.width
         glyph: "󰓃"
         summary: root.streamRouteSummary(streamRow.node)
@@ -1708,14 +1758,14 @@ Panel {
 
         Column {
           width: parent.width
-          spacing: Style.space(3)
+          spacing: root.sp(3)
 
           Text {
             textFormat: Text.PlainText
             text: "Where should " + root.streamDisplayName(streamRow.node) + " play?"
             color: root.bar.foreground
             font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.caption
+            font.pixelSize: root.fontCaption
             font.bold: true
             elide: Text.ElideRight
             width: parent.width
@@ -1736,11 +1786,11 @@ Panel {
                   : "Default output (" + root.nodeLabel(root.sink) + ")")
               color: chosen ? Color.accent : (choiceMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
               font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
+              font.pixelSize: root.fontCaption
               font.bold: chosen
               elide: Text.ElideRight
               width: parent.width
-              leftPadding: Style.space(6)
+              leftPadding: root.sp(6)
 
               MouseArea {
                 id: choiceMouse
@@ -1765,12 +1815,12 @@ Panel {
               + " on " + root.sinkLabelFor(targetName)
             color: checked ? Color.accent : (pinMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
             font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.caption
+            font.pixelSize: root.fontCaption
             font.bold: checked
             elide: Text.ElideRight
             width: parent.width
-            leftPadding: Style.space(6)
-            topPadding: Style.space(4)
+            leftPadding: root.sp(6)
+            topPadding: root.sp(4)
 
             MouseArea {
               id: pinMouse
@@ -1814,8 +1864,8 @@ Panel {
     text: "󰐥"
     color: root.bar.foreground
     font.family: root.bar.fontFamily
-    font.pixelSize: Style.font.body
-    width: Style.space(22)
+    font.pixelSize: root.fontBody
+    width: root.sp(22)
     horizontalAlignment: Text.AlignHCenter
     opacity: shown ? (disableMouse.containsMouse ? 1.0 : 0.55) : 0
 
@@ -1847,16 +1897,16 @@ Panel {
     foreground: root.bar.foreground
     fill: root.hoverFill
     currentFill: root.selectedFill
-    implicitHeight: disabledInner.implicitHeight + Style.spacing.xl
+    implicitHeight: disabledInner.implicitHeight + (Style.spacing.xl * root.densityScale)
 
     Row {
       id: disabledInner
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
-      spacing: Style.space(8)
+      anchors.leftMargin: root.sp(6)
+      anchors.rightMargin: root.sp(6)
+      spacing: root.sp(8)
       opacity: 0.55
 
       Text {
@@ -1864,8 +1914,8 @@ Panel {
         text: disabledRow.entry.kind === "source" ? "󰍭" : "󰓄"
         color: root.bar.foreground
         font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.title
-        width: Style.space(22)
+        font.pixelSize: root.fontTitle
+        width: root.sp(22)
         horizontalAlignment: Text.AlignHCenter
         anchors.verticalCenter: parent.verticalCenter
       }
@@ -1875,9 +1925,9 @@ Panel {
         text: disabledRow.entry.label
         color: root.bar.foreground
         font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.body
+        font.pixelSize: root.fontBody
         elide: Text.ElideRight
-        width: parent.width - Style.space(22) - Style.space(8) - enableHint.width - Style.space(8)
+        width: parent.width - root.sp(22) - root.sp(8) - enableHint.width - root.sp(8)
         anchors.verticalCenter: parent.verticalCenter
       }
 
@@ -1887,7 +1937,7 @@ Panel {
         text: "ENABLE"
         color: root.bar.foreground
         font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.caption
+        font.pixelSize: root.fontCaption
         font.bold: true
         opacity: disabledRow.hasCursor ? 1.0 : 0
         anchors.verticalCenter: parent.verticalCenter
@@ -1915,7 +1965,7 @@ Panel {
     property string summary: ""
     property string glyph: ""
     property string actionText: ""
-    readonly property real bodyWidth: width - 2 * Style.space(8)
+    readonly property real bodyWidth: width - 2 * root.sp(8)
     default property alias content: fieldBody.data
     signal toggled()
     signal headerHovered()
@@ -1923,16 +1973,16 @@ Panel {
     bordered: true
     foreground: root.bar.foreground
     fill: root.hoverFill
-    implicitHeight: fieldColumn.implicitHeight + 2 * Style.space(6)
+    implicitHeight: fieldColumn.implicitHeight + 2 * root.sp(6)
 
     Column {
       id: fieldColumn
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: parent.top
-      anchors.margins: Style.space(8)
-      anchors.topMargin: Style.space(6)
-      spacing: Style.space(6)
+      anchors.margins: root.sp(8)
+      anchors.topMargin: root.sp(6)
+      spacing: root.sp(6)
 
       Item {
         width: parent.width
@@ -1947,21 +1997,21 @@ Panel {
           text: field.glyph
           color: root.bar.foreground
           font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
-          width: text ? Style.space(18) : 0
+          font.pixelSize: root.fontCaption
+          width: text ? root.sp(18) : 0
         }
 
         Text {
           id: fieldSummary
           anchors.left: fieldGlyph.right
           anchors.right: fieldAction.left
-          anchors.rightMargin: Style.space(8)
+          anchors.rightMargin: root.sp(8)
           anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.PlainText
           text: field.summary
           color: root.bar.foreground
           font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.fontCaption
           elide: Text.ElideRight
         }
 
@@ -1973,14 +2023,14 @@ Panel {
           text: (field.actionText ? field.actionText + " " : "") + (field.expanded ? "󰅃" : "󰅀")
           color: root.bar.foreground
           font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.fontCaption
           font.bold: true
         }
 
         MouseArea {
           id: fieldMouse
           anchors.fill: parent
-          anchors.margins: -Style.space(6)
+          anchors.margins: -root.sp(6)
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
           onContainsMouseChanged: if (containsMouse) field.headerHovered()
@@ -1999,7 +2049,7 @@ Panel {
         id: fieldBody
         visible: field.expanded
         width: parent.width
-        spacing: Style.space(3)
+        spacing: root.sp(3)
       }
     }
   }
@@ -2010,10 +2060,10 @@ Panel {
     id: eq
     property real peak: 0
     readonly property var levels: Model.eqBarLevels(peak, root.eqPhase)
-    readonly property real barHeight: Math.round(Style.font.caption * 0.9)
+    readonly property real barHeight: Math.round(root.fontBody * 0.85)
 
-    visible: levels[0] > 0
-    spacing: Math.max(1, Style.space(2))
+    visible: root.showPlayingBars && levels[0] > 0
+    spacing: Math.max(1, root.sp(2))
     height: barHeight
 
     Repeater {
@@ -2022,12 +2072,187 @@ Panel {
       Rectangle {
         required property int index
         anchors.bottom: parent.bottom
-        width: Math.max(2, Style.space(3))
+        width: Math.max(2, root.sp(3))
         height: Math.max(2, eq.barHeight * eq.levels[index])
         radius: width / 2
         color: Color.accent
         Behavior on height { NumberAnimation { duration: 90 } }
       }
+    }
+  }
+
+  // A row of text choices; the selected one is accent, bold and underlined.
+  // choices: [{ value, label }].
+  component ChoiceChips: Row {
+    id: chips
+    property var choices: []
+    property var selected
+    signal picked(var value)
+
+    spacing: root.sp(8)
+
+    Repeater {
+      model: chips.choices
+
+      Text {
+        required property var modelData
+        readonly property bool chosen: chips.selected === modelData.value
+        textFormat: Text.PlainText
+        text: modelData.label
+        color: chosen ? Color.accent : root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: root.fontCaption
+        font.bold: chosen
+        font.underline: chosen
+        opacity: chosen || chipMouse.containsMouse ? 1.0 : 0.55
+
+        MouseArea {
+          id: chipMouse
+          anchors.fill: parent
+          anchors.margins: -root.sp(3)
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: chips.picked(parent.modelData.value)
+        }
+      }
+    }
+  }
+
+  // A labelled on/off switch row for the settings view.
+  component SettingSwitch: Item {
+    id: settingRow
+    property string label: ""
+    property bool checked: false
+    signal toggled()
+
+    implicitHeight: Math.max(settingLabel.implicitHeight, settingToggle.implicitHeight)
+
+    Text {
+      id: settingLabel
+      anchors.left: parent.left
+      anchors.right: settingToggle.left
+      anchors.rightMargin: root.sp(8)
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: settingRow.label
+      color: root.bar.foreground
+      font.family: root.bar.fontFamily
+      font.pixelSize: root.fontBody
+      elide: Text.ElideRight
+    }
+
+    ToggleSwitch {
+      id: settingToggle
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      checked: settingRow.checked
+      foreground: root.bar.foreground
+      onToggled: settingRow.toggled()
+    }
+  }
+
+  // Replaces the panel content while the gear is on. Every change is saved
+  // to shell.json straight away and read back through setting().
+  component SettingsView: Column {
+    spacing: root.sp(12)
+
+    PanelSeparator {
+      foreground: root.bar.foreground
+    }
+
+    Item {
+      width: parent.width
+      implicitHeight: settingsBack.implicitHeight
+
+      Text {
+        id: settingsBack
+        textFormat: Text.PlainText
+        text: "󰁍 Back"
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: root.fontCaption
+        font.bold: true
+        opacity: backMouse.containsMouse ? 1.0 : 0.75
+
+        MouseArea {
+          id: backMouse
+          anchors.fill: parent
+          anchors.margins: -root.sp(4)
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.settingsOpen = false
+        }
+      }
+    }
+
+    PanelSectionHeader {
+      text: "DENSITY"
+      foreground: root.bar.foreground
+      fontFamily: root.bar.fontFamily
+    }
+
+    ChoiceChips {
+      choices: [
+        { value: "compact", label: "Compact" },
+        { value: "normal", label: "Normal" },
+        { value: "comfortable", label: "Comfortable" }
+      ]
+      selected: root.density
+      onPicked: function(value) { root.setSetting("density", value) }
+    }
+
+    PanelSeparator {
+      foreground: root.bar.foreground
+    }
+
+    PanelSectionHeader {
+      text: "SHOW"
+      foreground: root.bar.foreground
+      fontFamily: root.bar.fontFamily
+    }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Playing bars"
+      checked: root.showPlayingBars
+      onToggled: root.setSetting("showPlayingBars", !root.showPlayingBars)
+    }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Output field under each app"
+      checked: root.showRouting
+      onToggled: root.setSetting("showRouting", !root.showRouting)
+    }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Disabled devices section"
+      checked: root.showDisabled
+      onToggled: root.setSetting("showDisabled", !root.showDisabled)
+    }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Volume step footer"
+      checked: root.showStepFooter
+      onToggled: root.setSetting("showStepFooter", !root.showStepFooter)
+    }
+
+    PanelSeparator {
+      foreground: root.bar.foreground
+    }
+
+    PanelSectionHeader {
+      text: "VOLUME STEP"
+      foreground: root.bar.foreground
+      fontFamily: root.bar.fontFamily
+    }
+
+    ChoiceChips {
+      choices: root.scrollStepChoices.map(function(v) { return { value: v, label: v + "%" } })
+      selected: root.scrollStep
+      onPicked: function(value) { root.setScrollStep(value) }
     }
   }
 }

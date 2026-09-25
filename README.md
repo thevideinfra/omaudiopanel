@@ -28,9 +28,16 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
 - **Tell browser tabs apart.** Chromium-based browsers name every stream
   "Playback". When it can tell for certain, the mixer shows the tab instead:
   "Brave – Lions vs Bills Highlights". Otherwise it numbers them: "Brave · 1 of 2".
+- **See what is playing.** Small equalizer bars move next to OUTPUT and
+  beside each app that is making sound, in your theme's accent colour — as do
+  the volume sliders, level meters and the device in use.
 - **Pick the volume step.** 1%, 2%, 5% or 10% per scroll notch on the bar
   icon, per slider step and per `h`/`l` in the panel, set from the panel's
   footer.
+- **Make it yours.** The ⚙ in the panel header opens its settings: a
+  **Compact**, **Normal** or **Comfortable** layout, and switches to hide the
+  playing bars, the output field under each app, the Disabled section or the
+  volume step footer.
 
 Changing the default output also leaves apps you routed or pinned where they
 are, instead of moving every stream to the new default.
@@ -68,13 +75,26 @@ o.bind("XF86AudioLowerVolume", "Volume down", omaudiopanel .. " volume down", { 
 
 ## Settings
 
-| Key          | Default | Meaning                                              |
-|--------------|---------|------------------------------------------------------|
-| `scrollStep` | `5`     | Volume step in percent (1–25). The footer sets it.   |
+Everything here is also in the panel's ⚙ settings view, which saves as you
+click. From a terminal:
+
+| Key               | Default    | Meaning                                                  |
+|-------------------|------------|----------------------------------------------------------|
+| `density`         | `"normal"` | `"compact"`, `"normal"` or `"comfortable"` (stock size)  |
+| `scrollStep`      | `5`        | Volume step in percent (1–25)                            |
+| `showPlayingBars` | `true`     | Equalizer bars next to OUTPUT and each playing app       |
+| `showRouting`     | `true`     | The "Playing on …" output field under each app           |
+| `showDisabled`    | `true`     | The Disabled devices section                             |
+| `showStepFooter`  | `true`     | The volume step footer                                   |
 
 ```bash
+omarchy bar set videinfra.omaudiopanel density '"compact"' --json
 omarchy bar set videinfra.omaudiopanel scrollStep 2 --json
+omarchy bar set videinfra.omaudiopanel showStepFooter false --json
 ```
+
+Hiding the Disabled section leaves those devices off; show it again to turn
+one back on.
 
 ## How it works
 
