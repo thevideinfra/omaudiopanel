@@ -1036,9 +1036,11 @@ Panel {
             AccentSwitch {
               id: powerSwitch
               checked: root.anyAudible
+              // Keyboard focus only; hovering no longer moves the cursor here,
+              // so the pointer never triggers the focus look.
+              focused: root.headerHasCursor
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              onHovered: function(on) { if (on) root.setHeaderCursor() }
               onToggled: root.toggleAllMuted()
 
               PanelToolTip {
@@ -2312,11 +2314,12 @@ Panel {
   }
 
   // On/off switch in the theme accent: accent track and knob when on, a dim
-  // neutral track when off. No hover or focus outline, so every switch in the
-  // panel looks the same under the pointer.
+  // neutral track when off. No outline on hover. `focused` marks the keyboard
+  // cursor with a brighter track and a larger knob instead of a ring.
   component AccentSwitch: Item {
     id: sw
     property bool checked: false
+    property bool focused: false
     readonly property bool containsMouse: swMouse.containsMouse
     signal toggled()
     signal hovered(bool on)
@@ -2327,17 +2330,19 @@ Panel {
     Rectangle {
       anchors.fill: parent
       radius: height / 2
-      color: sw.checked ? Util.alpha(Color.accent, 0.3) : Util.alpha(root.bar.foreground, 0.1)
+      color: sw.checked
+        ? Util.alpha(Color.accent, sw.focused ? 0.55 : 0.3)
+        : Util.alpha(root.bar.foreground, sw.focused ? 0.25 : 0.1)
       border.width: 1
-      border.color: sw.checked ? Color.accent : Util.alpha(root.bar.foreground, 0.25)
+      border.color: sw.checked ? Color.accent : Util.alpha(root.bar.foreground, sw.focused ? 0.6 : 0.25)
       Behavior on color { ColorAnimation { duration: 120 } }
 
       Rectangle {
-        width: parent.height - root.sp(6)
+        width: parent.height - root.sp(sw.focused ? 3 : 6)
         height: width
         radius: width / 2
         anchors.verticalCenter: parent.verticalCenter
-        x: sw.checked ? parent.width - width - root.sp(3) : root.sp(3)
+        x: sw.checked ? parent.width - width - (parent.height - height) / 2 : (parent.height - height) / 2
         color: sw.checked ? Color.accent : Qt.darker(root.bar.foreground, 1.4)
         Behavior on x { NumberAnimation { duration: 120 } }
         Behavior on color { ColorAnimation { duration: 120 } }
