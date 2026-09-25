@@ -1036,7 +1036,6 @@ Panel {
             AccentSwitch {
               id: powerSwitch
               checked: root.anyAudible
-              hasCursor: root.headerHasCursor
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               onHovered: function(on) { if (on) root.setHeaderCursor() }
@@ -2279,27 +2278,17 @@ Panel {
   }
 
   // On/off switch in the theme accent: accent track and knob when on, a dim
-  // neutral track when off. hasCursor draws the keyboard focus ring.
+  // neutral track when off. No hover or focus outline, so every switch in the
+  // panel looks the same under the pointer.
   component AccentSwitch: Item {
     id: sw
     property bool checked: false
-    property bool hasCursor: false
     readonly property bool containsMouse: swMouse.containsMouse
     signal toggled()
     signal hovered(bool on)
 
     implicitWidth: root.sp(34)
     implicitHeight: root.sp(18)
-
-    Rectangle {
-      visible: sw.hasCursor
-      anchors.fill: parent
-      anchors.margins: -root.sp(3)
-      radius: height / 2
-      color: "transparent"
-      border.width: 1
-      border.color: Util.alpha(root.bar.foreground, 0.6)
-    }
 
     Rectangle {
       anchors.fill: parent

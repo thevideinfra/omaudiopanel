@@ -81,7 +81,7 @@ click. From a terminal:
 
 | Key               | Default    | Meaning                                                  |
 |-------------------|------------|----------------------------------------------------------|
-| `density`         | `"normal"` | `"compact"`, `"normal"` or `"comfortable"` (stock size)  |
+| `density`         | `"normal"` | `"compact"`, `"normal"` or `"comfortable"`              |
 | `fontSize`        | `"normal"` | `"small"`, `"normal"` or `"large"`, on top of density    |
 | `scrollStep`      | `5`        | Volume step in percent (1–25)                            |
 | `showPlayingBars` | `true`     | Equalizer bars next to OUTPUT and each playing app       |

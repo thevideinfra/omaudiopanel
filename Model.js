@@ -362,12 +362,12 @@ function eqBarLevels(peak, phase) {
   return bars
 }
 
-// Size multiplier for the panel's own spacing, fonts and width.
-// Comfortable is the stock size; normal is the default.
+// Size multiplier for the panel's own spacing, fonts and width, relative
+// to the stock panel. All three are smaller than stock; normal is the default.
 function densityScale(name) {
-  if (name === "compact") return 0.76
-  if (name === "comfortable") return 1
-  return 0.88
+  if (name === "compact") return 0.66
+  if (name === "comfortable") return 0.88
+  return 0.76
 }
 
 // Text size multiplier chosen in settings, applied on top of the density's

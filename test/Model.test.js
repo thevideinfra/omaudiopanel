@@ -111,7 +111,9 @@ test("eqBarLevels grows with the level at the same phase", () => {
 
 test("densityScale shrinks from comfortable to compact and defaults to normal", () => {
   const c = M.densityScale("compact"), n = M.densityScale("normal"), f = M.densityScale("comfortable")
-  assert.equal(f, 1)
+  // Normal is the former compact size; all three sit below the stock size.
+  assert.equal(n, 0.76)
+  assert.ok(f < 1)
   assert.ok(c < n && n < f)
   assert.equal(M.densityScale("bogus"), n)
   assert.equal(M.densityScale(undefined), n)
