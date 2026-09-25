@@ -3,7 +3,7 @@
 Omarchy's audio panel, with the controls it was missing.
 
 <p>
-  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: outputs, inputs, Brave in the mixer with its output field, the folded Disabled section and the volume step" width="360">
+  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: playing bars next to OUTPUT, the device in use marked in the accent colour, Brave in the mixer with its output field and mute switch, the folded Disabled section and the volume step" width="360">
   <img src="assets/omaudioroute.png" alt="The same panel with Brave's output picker open, the option to always play it on one output, and the power icon for disabling an output" width="360">
 </p>
 
@@ -20,7 +20,7 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
 
 - **Choose where each app plays.** Under every app in the mixer, a
   "Playing on CORSAIR HS80" field shows its output. Click it to pick another
-  (or press `r` to step through outputs).
+  (or press `r` to step through outputs). The switch beside it mutes the app.
 - **Pin an app to an output.** In that picker, tick **Always play Brave on
   USB AUDIO CODEC** — the output you picked, or the one it is playing on. Every
   new Brave stream goes there. If the output disappears,
@@ -39,6 +39,8 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   or **Large** font size, and switches to hide the
   playing bars, the output field under each app, the Disabled section or the
   volume step footer.
+
+  <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, switches for each section and the volume step" width="300">
 
 Changing the default output also leaves apps you routed or pinned where they
 are, instead of moving every stream to the new default.

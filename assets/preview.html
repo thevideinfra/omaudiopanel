@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- Source for preview.png (the plugin site thumbnail). Render with:
+     chromium --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+       --window-size=1280,720 --allow-file-access-from-files \
+       --screenshot=preview.png "file://$PWD/assets/preview.html"
+-->
+<html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1280px;height:720px;overflow:hidden}
+body{background:radial-gradient(ellipse 70% 80% at 55% 50%,#1d1733 0%,#110d1f 55%,#08060f 100%);
+ font-family:"JetBrainsMono Nerd Font","JetBrains Mono",monospace;color:#eef4f0;position:relative}
+.left{position:absolute;left:72px;top:92px;width:480px}
+h1{font-size:60px;font-weight:700;letter-spacing:-1px;line-height:1}
+.sub{margin-top:26px;font-size:22px;line-height:1.5;color:#9dbcb1}
+.label{margin-top:44px;font-size:19px;font-weight:700;letter-spacing:1px;color:#5fd6a0}
+ul{list-style:none;margin-top:16px}
+li{font-size:19px;line-height:1.55;color:#eef4f0}
+li span{color:#9dbcb1}
+.right{position:absolute;right:56px;top:40px;display:flex;gap:26px;align-items:flex-start}
+.shot{display:flex;flex-direction:column;gap:12px}
+.shot .label{margin:0;font-size:16px}
+.shot img{width:300px;height:auto;border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+</style></head><body>
+<div class="left">
+ <h1>omaudiopanel</h1>
+ <div class="sub">Omarchy's audio panel,<br>with the controls it was missing</div>
+ <div class="label">ADDS</div>
+ <ul>
+  <li>Disable outputs &amp; inputs</li>
+  <li>Route &amp; pin apps <span>to any output</span></li>
+  <li>Mute per app <span>with one switch</span></li>
+  <li>Live playing bars <span>in your accent</span></li>
+  <li>Browser tab titles <span>in the mixer</span></li>
+  <li>Density, font size <span>&amp; volume step</span></li>
+ </ul>
+</div>
+<div class="right">
+ <div class="shot"><div class="label">PANEL</div><img src="omaudiopanel.png"></div>
+ <div class="shot"><div class="label">OUTPUT PICKER</div><img src="omaudioroute.png"></div>
+</div>
+</body></html>
