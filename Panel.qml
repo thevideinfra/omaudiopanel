@@ -1792,7 +1792,7 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              text: "Where should " + root.streamDisplayName(streamRow.node) + " play?"
+              text: "Where should " + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node)) + " play?"
               color: root.bar.foreground
               font.family: root.bar.fontFamily
               font.pixelSize: root.fontCaption

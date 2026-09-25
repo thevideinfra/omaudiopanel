@@ -66,9 +66,12 @@ card_json() {
 }
 
 # id<TAB>routed-sink for every stream with a target in the default metadata.
+# WirePlumber writes -1 for "no specific target", which means the stream
+# follows the default, so it is not a route.
 stream_routes() {
   timeout 2 pw-metadata 2>/dev/null \
-    | sed -n "s/^update: id:\([0-9]*\) key:'target\.object' value:'\([^']*\)'.*/\1\t\2/p"
+    | sed -n "s/^update: id:\([0-9]*\) key:'target\.object' value:'\([^']*\)'.*/\1\t\2/p" \
+    | awk -F'\t' '$2 != "" && $2 != "-1"'
 }
 
 # id<TAB>app for every application playback stream.
@@ -93,7 +96,8 @@ apply_pins() {
 
 routed_stream_ids() {
   timeout 2 pw-metadata 2>/dev/null \
-    | sed -n "s/^update: id:\([0-9]*\) key:'target\.\(object\|node\)'.*/\1/p" \
+    | sed -n "s/^update: id:\([0-9]*\) key:'target\.\(object\|node\)' value:'\([^']*\)'.*/\1\t\3/p" \
+    | awk -F'\t' '$2 != "" && $2 != "-1" { print $1 }' \
     | sort -u
 }
 

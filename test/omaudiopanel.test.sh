@@ -79,4 +79,13 @@ expect "list-streams reports app and paused state" \
   $'60\theadset\t\tBrave\t0\n61\theadset\t\tBrave\t1\n70\theadset\t\tFirefox\t0' \
   "$("$helper" list-streams)"
 
+setup
+# WirePlumber writes target.object = -1 (Spa:Id) for "no specific target".
+printf "update: id:60 key:'target.object' value:'-1' type:'Spa:Id'\nupdate: id:60 key:'target.node' value:'-1' type:'Spa:Id'\n" >"$FIX/metadata.txt"
+expect "list-streams treats a -1 target as following the default" \
+  $'60\theadset\t\tBrave\t0' "$("$helper" list-streams | head -1)"
+"$helper" pin Brave speakers "Speakers" >/dev/null
+expect "apply-pins routes a stream whose target is -1" \
+  $'60 target.object speakers\n61 target.object speakers' "$(cat "$FIX/writes.log")"
+
 (( failures == 0 )) && echo "all passed" || { echo "$failures failed"; exit 1; }
