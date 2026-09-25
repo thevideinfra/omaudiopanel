@@ -19,6 +19,8 @@ cat >"$work/bin/pactl" <<'EOF'
 case "$*" in
   "-f json list sinks") cat "$FIX/sinks.json" ;;
   "-f json list sink-inputs") cat "$FIX/inputs.json" ;;
+  "-f json list cards") cat "$FIX/cards.json" ;;
+  set-card-profile*) echo "$*" >>"$FIX/writes.log" ;;
 esac
 EOF
 cat >"$work/bin/pw-metadata" <<'EOF'
@@ -87,5 +89,25 @@ expect "list-streams treats a -1 target as following the default" \
 "$helper" pin Brave speakers "Speakers" >/dev/null
 expect "apply-pins routes a stream whose target is -1" \
   $'60 target.object speakers\n61 target.object speakers' "$(cat "$FIX/writes.log")"
+
+setup
+# Bluetooth nodes have no device.profile.name and their card profiles are
+# plain names (a2dp-sink), so disabling switches the card off and enabling
+# restores the profile it had.
+cat >"$FIX/sinks.json" <<'JSON'
+[{"index":7,"name":"bluez_output.AA_BB.1","properties":{"device.name":"bluez_card.AA_BB","device.api":"bluez5"}}]
+JSON
+cat >"$FIX/cards.json" <<'JSON'
+[{"name":"bluez_card.AA_BB","active_profile":"a2dp-sink","profiles":{
+  "off":{"sinks":0,"sources":0,"priority":0,"available":true},
+  "a2dp-sink":{"sinks":1,"sources":0,"priority":10,"available":true}}}]
+JSON
+"$helper" disable bluez_output.AA_BB.1 sink "Pebble V3"
+expect "disable turns a Bluetooth card off" "set-card-profile bluez_card.AA_BB off" "$(cat "$FIX/writes.log")"
+expect "disable remembers the Bluetooth profile" \
+  $'bluez_output.AA_BB.1\tsink\tPebble V3\tbluez_card.AA_BB\tprofile:a2dp-sink' "$("$helper" list-disabled)"
+: >"$FIX/writes.log"
+"$helper" enable bluez_output.AA_BB.1
+expect "enable restores the Bluetooth profile" "set-card-profile bluez_card.AA_BB a2dp-sink" "$(cat "$FIX/writes.log")"
 
 (( failures == 0 )) && echo "all passed" || { echo "$failures failed"; exit 1; }

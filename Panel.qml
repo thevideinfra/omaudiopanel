@@ -1517,6 +1517,17 @@ Panel {
         font.bold: sinkRow.isActive
         elide: Text.ElideRight
         width: parent.width - 2 * (root.sp(22) + root.sp(8))
+          - (Model.isBluetooth(sinkRow.node) ? root.sp(22) : 0)
+        anchors.verticalCenter: parent.verticalCenter
+      }
+      // Marks Bluetooth devices; the device glyph still shows its kind.
+      Text {
+        visible: Model.isBluetooth(sinkRow.node)
+        textFormat: Text.PlainText
+        text: "󰂯"
+        color: Color.accent
+        font.family: root.bar.fontFamily
+        font.pixelSize: root.fontBody
         anchors.verticalCenter: parent.verticalCenter
       }
     }
@@ -1599,6 +1610,17 @@ Panel {
         font.bold: sourceRow.isActive
         elide: Text.ElideRight
         width: parent.width - 2 * (root.sp(22) + root.sp(8))
+          - (Model.isBluetooth(sourceRow.node) ? root.sp(22) : 0)
+        anchors.verticalCenter: parent.verticalCenter
+      }
+      // Marks Bluetooth devices; the device glyph still shows its kind.
+      Text {
+        visible: Model.isBluetooth(sourceRow.node)
+        textFormat: Text.PlainText
+        text: "󰂯"
+        color: Color.accent
+        font.family: root.bar.fontFamily
+        font.pixelSize: root.fontBody
         anchors.verticalCenter: parent.verticalCenter
       }
     }
@@ -1961,6 +1983,17 @@ Panel {
         font.pixelSize: root.fontBody
         elide: Text.ElideRight
         width: parent.width - root.sp(22) - root.sp(8) - enableHint.width - root.sp(8)
+          - (Model.isBluetooth({ name: disabledRow.entry.name }) ? root.sp(22) : 0)
+        anchors.verticalCenter: parent.verticalCenter
+      }
+      // Marks Bluetooth devices; the device glyph still shows its kind.
+      Text {
+        visible: Model.isBluetooth({ name: disabledRow.entry.name })
+        textFormat: Text.PlainText
+        text: "󰂯"
+        color: Color.accent
+        font.family: root.bar.fontFamily
+        font.pixelSize: root.fontBody
         anchors.verticalCenter: parent.verticalCenter
       }
 

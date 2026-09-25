@@ -144,3 +144,10 @@ test("fontSizeScale orders small < normal < large and defaults to normal", () =>
   assert.equal(M.fontSizeScale("huge"), n)
   assert.equal(M.fontSizeScale(undefined), n)
 })
+
+test("isBluetooth recognises bluez nodes by name or device.api", () => {
+  assert.equal(M.isBluetooth({ name: "bluez_output.00_02_3C_B4_E3_74.1" }), true)
+  assert.equal(M.isBluetooth({ name: "x", ready: true, properties: { "device.api": "bluez5" } }), true)
+  assert.equal(M.isBluetooth({ name: "alsa_output.usb-ACTIONS_Pebble_V3-00.analog-stereo" }), false)
+  assert.equal(M.isBluetooth(null), false)
+})

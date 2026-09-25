@@ -118,16 +118,32 @@ case $cmd in
     read -r card profile_name < <(timeout 2 pactl -f json list "${kind}s" 2>/dev/null \
       | jq -r --arg n "$name" '.[] | select(.name == $n)
           | "\(.properties["device.name"] // "") \(.properties["device.profile.name"] // "")"')
-    [[ -n ${card:-} && -n ${profile_name:-} ]] || { echo "No card profile found for $name" >&2; exit 1; }
-
-    [[ $kind == sink ]] && part="output:$profile_name" || part="input:$profile_name"
+    [[ -n ${card:-} ]] || { echo "No card found for $name" >&2; exit 1; }
     json=$(card_json "$card")
     active=$(jq -r '.active_profile' <<<"$json")
-    remaining=$(jq -cn --arg a "$active" --arg p "$part" '$a | split("+") | map(select(. != $p and . != "off"))')
-    if [[ $remaining == "[]" ]]; then
-      target=off
+
+    if [[ -n ${profile_name:-} ]]; then
+      [[ $kind == sink ]] && part="output:$profile_name" || part="input:$profile_name"
+      remaining=$(jq -cn --arg a "$active" --arg p "$part" '$a | split("+") | map(select(. != $p and . != "off"))')
+      if [[ $remaining == "[]" ]]; then
+        target=off
+      else
+        target=$(choose_profile "$json" "$remaining" "")
+      fi
     else
-      target=$(choose_profile "$json" "$remaining" "")
+      # Bluetooth: profiles are whole modes (a2dp-sink, headset-head-unit),
+      # not output/input parts. Keep the other direction if some profile
+      # offers it without this one, else turn the card off; remember the
+      # active profile so enable can restore it exactly.
+      part="profile:$active"
+      [[ $kind == sink ]] && { drop=sinks; keep=sources; } || { drop=sources; keep=sinks; }
+      target=$(jq -r --arg drop "$drop" --arg keep "$keep" --arg a "$active" '
+        (.profiles[$a][$keep] // 0) as $had
+        | if $had == 0 then "off" else
+            ([.profiles | to_entries[]
+              | select(.value.available and .value[$drop] == 0 and .value[$keep] > 0)]
+             | sort_by(-.value.priority) | .[0].key) // "off"
+          end' <<<"$json")
     fi
 
     timeout 2 pactl set-card-profile "$card" "$target" || exit 1
@@ -140,7 +156,9 @@ case $cmd in
     name=${1:-}
     [[ -n $name && -f $state_file ]] || usage
     IFS=$'\t' read -r _ _ _ card part < <(awk -F'\t' -v n="$name" '$1 == n' "$state_file")
-    if [[ -n ${card:-} && -n ${part:-} ]]; then
+    if [[ -n ${card:-} && ${part:-} == profile:* ]]; then
+      timeout 2 pactl set-card-profile "$card" "${part#profile:}" || exit 1
+    elif [[ -n ${card:-} && -n ${part:-} ]]; then
       json=$(card_json "$card")
       active=$(jq -r '.active_profile' <<<"$json")
       want=$(jq -cn --arg a "$active" --arg p "$part" '($a | split("+") | map(select(. != "off" and . != "pro-audio"))) + [$p] | unique')

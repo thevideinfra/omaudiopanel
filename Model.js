@@ -86,6 +86,14 @@ function isHeadphones(node) {
     || blob.indexOf("airpod") !== -1
 }
 
+// Bluetooth nodes are named bluez_output.* / bluez_input.*; device.api is
+// bluez5 once the node is bound.
+function isBluetooth(node) {
+  if (!node) return false
+  if (String(node.name || "").indexOf("bluez_") === 0) return true
+  return nodeProps(node)["device.api"] === "bluez5"
+}
+
 function sinkGlyph(node) {
   if (!node) return "󰓃"
   if (isHeadphones(node)) return "󰋋"
@@ -437,6 +445,7 @@ if (typeof module !== "undefined") {
     eqBarLevels: eqBarLevels,
     densityScale: densityScale,
     settingBool: settingBool,
-    fontSizeScale: fontSizeScale
+    fontSizeScale: fontSizeScale,
+    isBluetooth: isBluetooth
   }
 }
