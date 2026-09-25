@@ -35,7 +35,8 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   icon, per slider step and per `h`/`l` in the panel, set from the panel's
   footer.
 - **Make it yours.** The ⚙ in the panel header opens its settings: a
-  **Compact**, **Normal** or **Comfortable** layout, and switches to hide the
+  **Compact**, **Normal** or **Comfortable** layout, a **Small**, **Normal**
+  or **Large** font size, and switches to hide the
   playing bars, the output field under each app, the Disabled section or the
   volume step footer.
 
@@ -81,6 +82,7 @@ click. From a terminal:
 | Key               | Default    | Meaning                                                  |
 |-------------------|------------|----------------------------------------------------------|
 | `density`         | `"normal"` | `"compact"`, `"normal"` or `"comfortable"` (stock size)  |
+| `fontSize`        | `"normal"` | `"small"`, `"normal"` or `"large"`, on top of density    |
 | `scrollStep`      | `5`        | Volume step in percent (1–25)                            |
 | `showPlayingBars` | `true`     | Equalizer bars next to OUTPUT and each playing app       |
 | `showRouting`     | `true`     | The "Playing on …" output field under each app           |

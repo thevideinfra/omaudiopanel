@@ -124,8 +124,10 @@ Panel {
   // ---- Display settings (shell.json, set from the gear view) ----
   readonly property string density: String(setting("density", "normal"))
   readonly property real densityScale: Model.densityScale(density)
-  // Text shrinks half as fast as spacing so compact stays readable.
-  readonly property real fontScale: 0.5 + 0.5 * densityScale
+  readonly property string fontSize: String(setting("fontSize", "normal"))
+  // Text shrinks half as fast as spacing so compact stays readable, then the
+  // font size setting scales it on top.
+  readonly property real fontScale: (0.5 + 0.5 * densityScale) * Model.fontSizeScale(fontSize)
   readonly property real fontTitle: Math.round(Style.font.title * fontScale)
   readonly property real fontBody: Math.round(Style.font.body * fontScale)
   readonly property real fontCaption: Math.max(9, Math.round(Style.font.caption * fontScale))
@@ -1031,11 +1033,10 @@ Panel {
             // Compact on/off switch on the trailing edge of the hero, and the
             // header's only cursor target. Checked means something is still
             // audible, so muting everything reads as switching audio off.
-            ToggleSwitch {
+            AccentSwitch {
               id: powerSwitch
               checked: root.anyAudible
               hasCursor: root.headerHasCursor
-              foreground: root.bar.foreground
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               onHovered: function(on) { if (on) root.setHeaderCursor() }
@@ -2137,16 +2138,15 @@ Panel {
       text: settingRow.label
       color: root.bar.foreground
       font.family: root.bar.fontFamily
-      font.pixelSize: root.fontBody
+      font.pixelSize: Math.round(root.fontBody * 0.92)
       elide: Text.ElideRight
     }
 
-    ToggleSwitch {
+    AccentSwitch {
       id: settingToggle
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       checked: settingRow.checked
-      foreground: root.bar.foreground
       onToggled: settingRow.toggled()
     }
   }
@@ -2201,6 +2201,22 @@ Panel {
       onPicked: function(value) { root.setSetting("density", value) }
     }
 
+    PanelSectionHeader {
+      text: "FONT SIZE"
+      foreground: root.bar.foreground
+      fontFamily: root.bar.fontFamily
+    }
+
+    ChoiceChips {
+      choices: [
+        { value: "small", label: "Small" },
+        { value: "normal", label: "Normal" },
+        { value: "large", label: "Large" }
+      ]
+      selected: root.fontSize
+      onPicked: function(value) { root.setSetting("fontSize", value) }
+    }
+
     PanelSeparator {
       foreground: root.bar.foreground
     }
@@ -2211,32 +2227,38 @@ Panel {
       fontFamily: root.bar.fontFamily
     }
 
-    SettingSwitch {
+    // The switches sit closer together than the view's sections.
+    Column {
       width: parent.width
-      label: "Playing bars"
-      checked: root.showPlayingBars
-      onToggled: root.setSetting("showPlayingBars", !root.showPlayingBars)
-    }
+      spacing: root.sp(6)
 
-    SettingSwitch {
-      width: parent.width
-      label: "Output field under each app"
-      checked: root.showRouting
-      onToggled: root.setSetting("showRouting", !root.showRouting)
-    }
+      SettingSwitch {
+        width: parent.width
+        label: "Playing bars"
+        checked: root.showPlayingBars
+        onToggled: root.setSetting("showPlayingBars", !root.showPlayingBars)
+      }
 
-    SettingSwitch {
-      width: parent.width
-      label: "Disabled devices section"
-      checked: root.showDisabled
-      onToggled: root.setSetting("showDisabled", !root.showDisabled)
-    }
+      SettingSwitch {
+        width: parent.width
+        label: "Output field under each app"
+        checked: root.showRouting
+        onToggled: root.setSetting("showRouting", !root.showRouting)
+      }
 
-    SettingSwitch {
-      width: parent.width
-      label: "Volume step footer"
-      checked: root.showStepFooter
-      onToggled: root.setSetting("showStepFooter", !root.showStepFooter)
+      SettingSwitch {
+        width: parent.width
+        label: "Disabled devices section"
+        checked: root.showDisabled
+        onToggled: root.setSetting("showDisabled", !root.showDisabled)
+      }
+
+      SettingSwitch {
+        width: parent.width
+        label: "Volume step footer"
+        checked: root.showStepFooter
+        onToggled: root.setSetting("showStepFooter", !root.showStepFooter)
+      }
     }
 
     PanelSeparator {
@@ -2253,6 +2275,60 @@ Panel {
       choices: root.scrollStepChoices.map(function(v) { return { value: v, label: v + "%" } })
       selected: root.scrollStep
       onPicked: function(value) { root.setScrollStep(value) }
+    }
+  }
+
+  // On/off switch in the theme accent: accent track and knob when on, a dim
+  // neutral track when off. hasCursor draws the keyboard focus ring.
+  component AccentSwitch: Item {
+    id: sw
+    property bool checked: false
+    property bool hasCursor: false
+    readonly property bool containsMouse: swMouse.containsMouse
+    signal toggled()
+    signal hovered(bool on)
+
+    implicitWidth: root.sp(34)
+    implicitHeight: root.sp(18)
+
+    Rectangle {
+      visible: sw.hasCursor
+      anchors.fill: parent
+      anchors.margins: -root.sp(3)
+      radius: height / 2
+      color: "transparent"
+      border.width: 1
+      border.color: Util.alpha(root.bar.foreground, 0.6)
+    }
+
+    Rectangle {
+      anchors.fill: parent
+      radius: height / 2
+      color: sw.checked ? Util.alpha(Color.accent, 0.3) : Util.alpha(root.bar.foreground, 0.1)
+      border.width: 1
+      border.color: sw.checked ? Color.accent : Util.alpha(root.bar.foreground, 0.25)
+      Behavior on color { ColorAnimation { duration: 120 } }
+
+      Rectangle {
+        width: parent.height - root.sp(6)
+        height: width
+        radius: width / 2
+        anchors.verticalCenter: parent.verticalCenter
+        x: sw.checked ? parent.width - width - root.sp(3) : root.sp(3)
+        color: sw.checked ? Color.accent : Qt.darker(root.bar.foreground, 1.4)
+        Behavior on x { NumberAnimation { duration: 120 } }
+        Behavior on color { ColorAnimation { duration: 120 } }
+      }
+    }
+
+    MouseArea {
+      id: swMouse
+      anchors.fill: parent
+      anchors.margins: -root.sp(3)
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onContainsMouseChanged: sw.hovered(containsMouse)
+      onClicked: sw.toggled()
     }
   }
 }

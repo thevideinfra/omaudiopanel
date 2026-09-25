@@ -24,7 +24,8 @@
       "showPlayingBars": true,
       "showRouting": true,
       "showDisabled": true,
-      "showStepFooter": true
+      "showStepFooter": true,
+      "fontSize": "normal"
     },
     "schema": [
       {
@@ -38,6 +39,18 @@
         ],
         "defaultValue": "normal",
         "description": "How tightly the panel is laid out."
+      },
+      {
+        "key": "fontSize",
+        "type": "enum",
+        "label": "Font size",
+        "options": [
+          "small",
+          "normal",
+          "large"
+        ],
+        "defaultValue": "normal",
+        "description": "Text size, on top of the density's own scaling."
       },
       {
         "key": "scrollStep",

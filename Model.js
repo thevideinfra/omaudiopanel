@@ -370,6 +370,14 @@ function densityScale(name) {
   return 0.88
 }
 
+// Text size multiplier chosen in settings, applied on top of the density's
+// own text scaling.
+function fontSizeScale(name) {
+  if (name === "small") return 0.9
+  if (name === "large") return 1.12
+  return 1
+}
+
 // shell.json values may arrive as real booleans or as "true"/"false" strings
 // (omarchy bar set without --json).
 function settingBool(value, fallback) {
@@ -428,6 +436,7 @@ if (typeof module !== "undefined") {
     scrollTargetFor: scrollTargetFor,
     eqBarLevels: eqBarLevels,
     densityScale: densityScale,
-    settingBool: settingBool
+    settingBool: settingBool,
+    fontSizeScale: fontSizeScale
   }
 }

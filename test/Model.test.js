@@ -133,3 +133,11 @@ test("eqBarLevels keeps quiet audio clearly visible", () => {
     for (const h of bars) assert.ok(h >= 0.3, `bar ${h} too short at phase ${phase}`)
   }
 })
+
+test("fontSizeScale orders small < normal < large and defaults to normal", () => {
+  assert.equal(M.fontSizeScale("normal"), 1)
+  assert.ok(M.fontSizeScale("small") < 1)
+  assert.ok(M.fontSizeScale("large") > 1)
+  assert.equal(M.fontSizeScale("huge"), 1)
+  assert.equal(M.fontSizeScale(undefined), 1)
+})
