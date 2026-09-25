@@ -1056,10 +1056,12 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
               text: root.settingsOpen ? "󰅖" : "󰒓"
-              color: root.settingsOpen ? Color.accent : root.bar.foreground
+              // Larger than the header text and accent on hover, so it reads
+              // as a control rather than decoration.
+              color: gearMouse.containsMouse || root.settingsOpen ? Color.accent : root.bar.foreground
               font.family: root.bar.fontFamily
-              font.pixelSize: root.fontTitle
-              opacity: gearMouse.containsMouse || root.settingsOpen ? 1.0 : 0.6
+              font.pixelSize: Math.round(root.fontTitle * 1.45)
+              opacity: gearMouse.containsMouse || root.settingsOpen ? 1.0 : 0.85
 
               MouseArea {
                 id: gearMouse

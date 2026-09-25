@@ -365,17 +365,17 @@ function eqBarLevels(peak, phase) {
 // Size multiplier for the panel's own spacing, fonts and width, relative
 // to the stock panel. All three are smaller than stock; normal is the default.
 function densityScale(name) {
-  if (name === "compact") return 0.66
-  if (name === "comfortable") return 0.88
-  return 0.76
+  if (name === "compact") return 0.61
+  if (name === "comfortable") return 0.83
+  return 0.71
 }
 
 // Text size multiplier chosen in settings, applied on top of the density's
 // own text scaling.
 function fontSizeScale(name) {
-  if (name === "small") return 0.9
-  if (name === "large") return 1.12
-  return 1
+  if (name === "small") return 0.85
+  if (name === "large") return 1.07
+  return 0.95
 }
 
 // shell.json values may arrive as real booleans or as "true"/"false" strings

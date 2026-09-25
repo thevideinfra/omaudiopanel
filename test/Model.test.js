@@ -112,7 +112,7 @@ test("eqBarLevels grows with the level at the same phase", () => {
 test("densityScale shrinks from comfortable to compact and defaults to normal", () => {
   const c = M.densityScale("compact"), n = M.densityScale("normal"), f = M.densityScale("comfortable")
   // Normal is the former compact size; all three sit below the stock size.
-  assert.equal(n, 0.76)
+  assert.equal(n, 0.71)
   assert.ok(f < 1)
   assert.ok(c < n && n < f)
   assert.equal(M.densityScale("bogus"), n)
@@ -137,9 +137,10 @@ test("eqBarLevels keeps quiet audio clearly visible", () => {
 })
 
 test("fontSizeScale orders small < normal < large and defaults to normal", () => {
-  assert.equal(M.fontSizeScale("normal"), 1)
-  assert.ok(M.fontSizeScale("small") < 1)
-  assert.ok(M.fontSizeScale("large") > 1)
-  assert.equal(M.fontSizeScale("huge"), 1)
-  assert.equal(M.fontSizeScale(undefined), 1)
+  const n = M.fontSizeScale("normal")
+  assert.equal(n, 0.95)
+  assert.ok(M.fontSizeScale("small") < n)
+  assert.ok(M.fontSizeScale("large") > n)
+  assert.equal(M.fontSizeScale("huge"), n)
+  assert.equal(M.fontSizeScale(undefined), n)
 })
