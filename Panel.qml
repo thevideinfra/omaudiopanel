@@ -1662,6 +1662,9 @@ Panel {
 
     Column {
       id: streamColumn
+      // Apps play into the output, so they fade with it when it is muted,
+      // like the output and input rows do.
+      opacity: root.outputMuted ? 0.5 : 1.0
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
@@ -1749,92 +1752,118 @@ Panel {
         }
       }
 
-      // Where this app plays, as a field that opens to the output choices.
-      DropdownField {
-        visible: root.showRouting
+      // Where this app plays, as a field that opens to the output choices,
+      // with a mute switch beside it (on = playing).
+      Item {
         width: parent.width
-        glyph: "󰓃"
-        summary: root.streamRouteSummary(streamRow.node)
-        expanded: streamRow.routeExpanded
-        onToggled: root.expandedStreamId = streamRow.routeExpanded ? -1 : streamRow.node.id
+        implicitHeight: Math.max(streamField.visible ? streamField.implicitHeight : 0, streamMuteSwitch.implicitHeight)
 
-        Column {
-          width: parent.width
-          spacing: root.sp(3)
-
-          Text {
-            textFormat: Text.PlainText
-            text: "Where should " + root.streamDisplayName(streamRow.node) + " play?"
-            color: root.bar.foreground
-            font.family: root.bar.fontFamily
-            font.pixelSize: root.fontCaption
-            font.bold: true
-            elide: Text.ElideRight
-            width: parent.width
+        AccentSwitch {
+          id: streamMuteSwitch
+          anchors.right: parent.right
+          y: streamField.visible ? streamField.headerCenterY - height / 2 : 0
+          checked: !streamRow.streamMuted
+          onToggled: {
+            if (streamRow.node && streamRow.node.audio)
+              streamRow.node.audio.muted = !streamRow.node.audio.muted
           }
 
-          Repeater {
-            model: streamRow.routeChoices
+          PanelToolTip {
+            visible: streamMuteSwitch.containsMouse
+            text: (streamRow.streamMuted ? "Unmute " : "Mute ") + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node))
+            fontFamily: root.bar.fontFamily
+          }
+        }
+
+        DropdownField {
+          id: streamField
+          visible: root.showRouting
+          anchors.left: parent.left
+          anchors.right: streamMuteSwitch.left
+          anchors.rightMargin: root.sp(8)
+          glyph: "󰓃"
+          summary: root.streamRouteSummary(streamRow.node)
+          expanded: streamRow.routeExpanded
+          onToggled: root.expandedStreamId = streamRow.routeExpanded ? -1 : streamRow.node.id
+
+          Column {
+            width: parent.width
+            spacing: root.sp(3)
 
             Text {
-              required property var modelData
-              readonly property bool chosen: modelData.sink
-                ? root.streamRouteName(streamRow.node) === String(modelData.sink.name)
-                : !streamRow.routed
               textFormat: Text.PlainText
-              text: (chosen ? "󰐾  " : "󰄰  ")
-                + (modelData.sink
-                  ? root.nodeLabel(modelData.sink)
-                  : "Default output (" + root.nodeLabel(root.sink) + ")")
-              color: chosen ? Color.accent : (choiceMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
+              text: "Where should " + root.streamDisplayName(streamRow.node) + " play?"
+              color: root.bar.foreground
               font.family: root.bar.fontFamily
               font.pixelSize: root.fontCaption
-              font.bold: chosen
+              font.bold: true
+              elide: Text.ElideRight
+              width: parent.width
+            }
+
+            Repeater {
+              model: streamRow.routeChoices
+
+              Text {
+                required property var modelData
+                readonly property bool chosen: modelData.sink
+                  ? root.streamRouteName(streamRow.node) === String(modelData.sink.name)
+                  : !streamRow.routed
+                textFormat: Text.PlainText
+                text: (chosen ? "󰐾  " : "󰄰  ")
+                  + (modelData.sink
+                    ? root.nodeLabel(modelData.sink)
+                    : "Default output (" + root.nodeLabel(root.sink) + ")")
+                color: chosen ? Color.accent : (choiceMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
+                font.family: root.bar.fontFamily
+                font.pixelSize: root.fontCaption
+                font.bold: chosen
+                elide: Text.ElideRight
+                width: parent.width
+                leftPadding: root.sp(6)
+
+                MouseArea {
+                  id: choiceMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  // The picker stays open so the pin checkbox below can follow.
+                  onClicked: root.routeStream(streamRow.node, parent.modelData.sink)
+                }
+              }
+            }
+
+            // Pins the app to the output chosen above, or to the one it is on now.
+            Text {
+              id: pinToggle
+              readonly property var pin: root.streamPin(streamRow.node)
+              readonly property string targetName: Model.pinTarget(root.streamInfo[streamRow.node ? streamRow.node.id : -1])
+              readonly property bool checked: !!pin && pin.sink === targetName
+              visible: targetName !== ""
+              textFormat: Text.PlainText
+              text: (checked ? "󰄲  " : "󰄱  ") + "Always play " + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node))
+                + " on " + root.sinkLabelFor(targetName)
+              color: checked ? Color.accent : (pinMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
+              font.family: root.bar.fontFamily
+              font.pixelSize: root.fontCaption
+              font.bold: checked
               elide: Text.ElideRight
               width: parent.width
               leftPadding: root.sp(6)
+              topPadding: root.sp(4)
 
               MouseArea {
-                id: choiceMouse
+                id: pinMouse
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                // The picker stays open so the pin checkbox below can follow.
-                onClicked: root.routeStream(streamRow.node, parent.modelData.sink)
-              }
-            }
-          }
-
-          // Pins the app to the output chosen above, or to the one it is on now.
-          Text {
-            id: pinToggle
-            readonly property var pin: root.streamPin(streamRow.node)
-            readonly property string targetName: Model.pinTarget(root.streamInfo[streamRow.node ? streamRow.node.id : -1])
-            readonly property bool checked: !!pin && pin.sink === targetName
-            visible: targetName !== ""
-            textFormat: Text.PlainText
-            text: (checked ? "󰄲  " : "󰄱  ") + "Always play " + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node))
-              + " on " + root.sinkLabelFor(targetName)
-            color: checked ? Color.accent : (pinMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
-            font.family: root.bar.fontFamily
-            font.pixelSize: root.fontCaption
-            font.bold: checked
-            elide: Text.ElideRight
-            width: parent.width
-            leftPadding: root.sp(6)
-            topPadding: root.sp(4)
-
-            MouseArea {
-              id: pinMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: {
-                if (pinToggle.checked) {
-                  root.unpinStream(streamRow.node)
-                  return
+                onClicked: {
+                  if (pinToggle.checked) {
+                    root.unpinStream(streamRow.node)
+                    return
+                  }
+                  root.pinStream(streamRow.node, pinToggle.targetName, root.sinkLabelFor(pinToggle.targetName))
                 }
-                root.pinStream(streamRow.node, pinToggle.targetName, root.sinkLabelFor(pinToggle.targetName))
               }
             }
           }
@@ -1968,6 +1997,8 @@ Panel {
     property string glyph: ""
     property string actionText: ""
     readonly property real bodyWidth: width - 2 * root.sp(8)
+    // Vertical middle of the summary line, for aligning controls beside it.
+    readonly property real headerCenterY: fieldColumn.y + fieldHeader.y + fieldHeader.height / 2
     default property alias content: fieldBody.data
     signal toggled()
     signal headerHovered()
@@ -1987,6 +2018,7 @@ Panel {
       spacing: root.sp(6)
 
       Item {
+        id: fieldHeader
         width: parent.width
         implicitHeight: Math.max(fieldSummary.implicitHeight, fieldAction.implicitHeight)
         opacity: fieldMouse.containsMouse || field.expanded || field.hasCursor ? 1.0 : 0.8
