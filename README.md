@@ -51,13 +51,9 @@ are, instead of moving every stream to the new default.
 omarchy plugin add https://github.com/thevideinfra/omaudiopanel.git --enable --yes
 ```
 
-It declares itself a replacement for `omarchy.audio`, so `Super+Ctrl+A` and
-other callers of the built-in panel open this one. Put it where the stock
-widget was:
-
-```bash
-omarchy bar put videinfra.omaudiopanel --after omarchy.network
-```
+It declares itself a replacement for `omarchy.audio`: it takes the stock
+audio widget's place in the bar, and `Super+Ctrl+A` and other callers of the
+built-in panel open this one.
 
 Needs Omarchy 4+, plus `pactl`, `pw-metadata` and `jq` (all present on a
 standard install).
@@ -75,6 +71,29 @@ hl.unbind("XF86AudioLowerVolume")
 o.bind("XF86AudioRaiseVolume", "Volume up", omaudiopanel .. " volume up", { locked = true, repeating = true })
 o.bind("XF86AudioLowerVolume", "Volume down", omaudiopanel .. " volume down", { locked = true, repeating = true })
 ```
+
+### Update
+
+```bash
+omarchy plugin update videinfra.omaudiopanel
+omarchy restart shell
+```
+
+### Uninstall
+
+Turn disabled devices back on first. Disabling switches a device's card
+profile, and WirePlumber keeps that profile after the plugin is gone. Click
+each one in the Disabled section, or reset a card by hand with
+`pactl set-card-profile <card> <profile>`.
+
+```bash
+omarchy plugin remove videinfra.omaudiopanel
+```
+
+The stock audio widget returns to its place in the bar. If you added the
+volume key binding, remove it from `~/.config/hypr/bindings.lua` too; it
+points into the plugin folder. Pins are kept in
+`~/.local/state/omaudiopanel/` and can be deleted.
 
 ## Settings
 
