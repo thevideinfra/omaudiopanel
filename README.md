@@ -37,7 +37,7 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
 - **Make it yours.** The ⚙ in the panel header opens its settings: a
   **Compact**, **Normal** or **Comfortable** layout, a **Small**, **Normal**
   or **Large** font size, and switches to hide the
-  playing bars, the output field under each app, the Disabled section or the
+  playing bars, the output and input mute switches, the output field under each app, the Disabled section or the
   volume step footer.
 
   <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, switches for each section and the volume step" width="300">
@@ -106,6 +106,7 @@ click. From a terminal:
 | `fontSize`        | `"normal"` | `"small"`, `"normal"` or `"large"`, on top of density    |
 | `scrollStep`      | `5`        | Volume step in percent (1–25)                            |
 | `showPlayingBars` | `true`     | Equalizer bars next to OUTPUT and each playing app       |
+| `showSectionMutes`| `true`     | Mute switches beside OUTPUT and INPUT                    |
 | `showRouting`     | `true`     | The "Playing on …" output field under each app           |
 | `showDisabled`    | `true`     | The Disabled devices section                             |
 | `showStepFooter`  | `true`     | The volume step footer                                   |

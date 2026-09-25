@@ -135,6 +135,7 @@ Panel {
   readonly property bool showPlayingBars: Model.settingBool(setting("showPlayingBars", true), true)
   readonly property bool showRouting: Model.settingBool(setting("showRouting", true), true)
   readonly property bool showDisabled: Model.settingBool(setting("showDisabled", true), true)
+  readonly property bool showSectionMutes: Model.settingBool(setting("showSectionMutes", true), true)
   readonly property bool showStepFooter: Model.settingBool(setting("showStepFooter", true), true)
   property bool settingsOpen: false
 
@@ -1165,10 +1166,26 @@ Panel {
                   font.family: root.bar.fontFamily
                   font.pixelSize: root.fontCaption
                   font.bold: true
-                  anchors.right: parent.right
-                  anchors.rightMargin: root.sp(6)
+                  anchors.right: outputMuteSwitch.visible ? outputMuteSwitch.left : parent.right
+                  anchors.rightMargin: root.sp(outputMuteSwitch.visible ? 8 : 6)
                   anchors.verticalCenter: parent.verticalCenter
                   opacity: root.outputMuted ? 0.5 : 1.0
+                }
+
+                // Mutes just this side; the header switch mutes both.
+                AccentSwitch {
+                  id: outputMuteSwitch
+                  visible: root.showSectionMutes && root.hasOutput
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  checked: !root.outputMuted
+                  onToggled: root.toggleOutputMute()
+
+                  PanelToolTip {
+                    visible: outputMuteSwitch.containsMouse
+                    text: (root.outputMuted ? "Unmute " : "Mute ") + "output"
+                    fontFamily: root.bar.fontFamily
+                  }
                 }
               }
 
@@ -1254,10 +1271,26 @@ Panel {
                   font.family: root.bar.fontFamily
                   font.pixelSize: root.fontCaption
                   font.bold: true
-                  anchors.right: parent.right
-                  anchors.rightMargin: root.sp(6)
+                  anchors.right: inputMuteSwitch.visible ? inputMuteSwitch.left : parent.right
+                  anchors.rightMargin: root.sp(inputMuteSwitch.visible ? 8 : 6)
                   anchors.verticalCenter: parent.verticalCenter
                   opacity: root.inputMuted ? 0.5 : 1.0
+                }
+
+                // Mutes just this side; the header switch mutes both.
+                AccentSwitch {
+                  id: inputMuteSwitch
+                  visible: root.showSectionMutes && root.hasInput
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  checked: !root.inputMuted
+                  onToggled: root.toggleInputMute()
+
+                  PanelToolTip {
+                    visible: inputMuteSwitch.containsMouse
+                    text: (root.inputMuted ? "Unmute " : "Mute ") + "input"
+                    fontFamily: root.bar.fontFamily
+                  }
                 }
               }
 
@@ -2305,6 +2338,13 @@ Panel {
         label: "Playing bars"
         checked: root.showPlayingBars
         onToggled: root.setSetting("showPlayingBars", !root.showPlayingBars)
+      }
+
+      SettingSwitch {
+        width: parent.width
+        label: "Output & input mute switches"
+        checked: root.showSectionMutes
+        onToggled: root.setSetting("showSectionMutes", !root.showSectionMutes)
       }
 
       SettingSwitch {

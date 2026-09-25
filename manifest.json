@@ -25,7 +25,8 @@
       "showRouting": true,
       "showDisabled": true,
       "showStepFooter": true,
-      "fontSize": "normal"
+      "fontSize": "normal",
+      "showSectionMutes": true
     },
     "schema": [
       {
@@ -66,6 +67,12 @@
         "key": "showPlayingBars",
         "type": "boolean",
         "label": "Show playing bars",
+        "defaultValue": true
+      },
+      {
+        "key": "showSectionMutes",
+        "type": "boolean",
+        "label": "Show output and input mute switches",
         "defaultValue": true
       },
       {
