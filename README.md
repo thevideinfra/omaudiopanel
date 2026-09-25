@@ -3,7 +3,7 @@
 Omarchy's audio panel, with the controls it was missing.
 
 <p>
-  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: playing bars next to OUTPUT, the device in use marked in the accent colour, Brave in the mixer with its output field and mute switch, the folded Disabled section and the volume step" width="360">
+  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: playing bars and a mute switch on OUTPUT and INPUT, a Bluetooth speaker marked as such, Brave in the mixer with its output field and mute switch, the folded Disabled section and the volume step" width="360">
   <img src="assets/omaudioroute.png" alt="The same panel with Brave's output picker open, the option to always play it on one output, and the power icon for disabling an output" width="360">
 </p>
 
@@ -14,10 +14,13 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
 - **Disable devices.** Hover an output or input and click the power icon (or
   press `d`). Disabled devices collect in a **Disabled** section at the bottom,
   folded into one line ("4 devices turned off"). Click **Show** to list them,
-  then click one to turn it back on. Nothing else is interrupted.
+  then click one to turn it back on. Nothing else is interrupted. Bluetooth
+  devices carry a Bluetooth mark and can be disabled too.
 
   <img src="assets/omaudiodisable.png" alt="Hovering an output shows a power icon with the tooltip Disable device (d)" width="300">
 
+- **Mute one side.** OUTPUT and INPUT each have their own switch; the one in
+  the header still mutes both.
 - **Choose where each app plays.** Under every app in the mixer, a
   "Playing on CORSAIR HS80" field shows its output. Click it to pick another
   (or press `r` to step through outputs). The switch beside it mutes the app.
@@ -40,7 +43,7 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   playing bars, the output and input mute switches, the output field under each app, the Disabled section or the
   volume step footer.
 
-  <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, switches for each section and the volume step" width="300">
+  <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, switches for each part of the panel and the volume step" width="300">
 
 Changing the default output also leaves apps you routed or pinned where they
 are, instead of moving every stream to the new default.
