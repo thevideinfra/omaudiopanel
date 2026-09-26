@@ -153,8 +153,9 @@ lives in `bin/omaudiopanel`, a small script the panel calls:
   may glitch for a moment. Other devices are unaffected.
 - Bluetooth profiles are not split into output and input parts, so disabling
   either side of a Bluetooth device turns it off.
-- A stream moved with another tool (pavucontrol, `wpctl`) keeps its pin mark,
-  so removing the pin can still move it back to the default.
+- A stream moved with another tool (pavucontrol, `wpctl`) keeps its pin mark.
+  Removing the pin leaves it where that tool put it, unless it was put back on
+  the pinned output, in which case it returns to the default.
 - Routing covers playback. Recording apps are not listed, as in the stock panel.
 - Games under Wine often open several unnamed streams ("audio stream #1",
   "#3"); they show as numbered rows, and a pin covers all of them.

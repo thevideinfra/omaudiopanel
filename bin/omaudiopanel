@@ -86,14 +86,31 @@ parse_routes() {
     | awk -F'\t' '$2 != "" && $2 != "-1"'
 }
 
-# id<TAB>app<TAB>sink for every pin marker, from a metadata dump on stdin.
+# id, app and sink for every pin marker, from a metadata dump on stdin,
+# separated by \x1f: unlike a tab, it does not collapse the empty app field
+# in bash's read.
+# pw-metadata prints values unescaped, so the value runs to the last
+# "' type:" (app names can contain an apostrophe). A marker from the previous
+# version holds only the sink; its app is left empty for marker_app to fill.
 parse_markers() {
-  sed -n "s/^update: id:\([0-9]*\) key:'omaudiopanel\.pin' value:'\([^']*\)'.*/\1\t\2/p" \
+  sed -n "s/^update: id:\([0-9]*\) key:'${pin_marker//./\\.}' value:'\(.*\)' type:.*/\1\t\2/p" \
     | awk -F'\t' '{
         n = split($2, part, "|"); sink = part[n]
-        if (n < 2 || sink == "") next
-        print $1 "\t" substr($2, 1, length($2) - length(sink) - 1) "\t" sink
+        if (sink == "") next
+        app = n < 2 ? "" : substr($2, 1, length($2) - length(sink) - 1)
+        print $1 "\037" app "\037" sink
       }'
+}
+
+# App of a marked stream: from the marker, or for an old sink-only marker,
+# from pactl (looked up once per run).
+marker_app() {
+  local id=$1 app=$2
+  if [[ -z $app ]]; then
+    [[ -n ${stream_app_list+set} ]] || stream_app_list=$(stream_apps)
+    app=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$stream_app_list")
+  fi
+  printf '%s' "$app"
 }
 
 stream_routes() {
@@ -129,7 +146,7 @@ apply_pins() {
 }
 
 routed_stream_ids() {
-  timeout 2 pw-metadata 2>/dev/null \
+  metadata_dump \
     | sed -n "s/^update: id:\([0-9]*\) key:'target\.\(object\|node\)' value:'\([^']*\)'.*/\1\t\3/p" \
     | awk -F'\t' '$2 != "" && $2 != "-1" { print $1 }' \
     | sort -u
@@ -142,7 +159,7 @@ case $cmd in
   pin | unpin | apply-pins | route | unroute | set-default-sink)
     mkdir -p "$(dirname "$lock_file")"
     exec 9>"$lock_file"
-    flock -w 10 9 || { echo "omaudiopanel: could not take $lock_file" >&2; exit 1; }
+    flock -w 30 9 || { echo "omaudiopanel: could not take $lock_file" >&2; exit 1; }
     ;;
 esac
 
@@ -256,28 +273,33 @@ case $cmd in
     printf '%s\t%s\t%s\n' "$app" "$sink" "${label:-$sink}" >>"$pins_file"
     # Re-pinning moves the pin's own routes (still on their marked output) to
     # the new output; routes set by hand stay.
-    dump=$(metadata_dump)
-    routes=$(parse_routes <<<"$dump")
-    while IFS=$'\t' read -r id marked_app marked_sink; do
-      [[ $marked_app == "$app" && $marked_sink != "$sink" ]] || continue
-      routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
-      [[ $routed == "$marked_sink" ]] && pin_route "$id" "$app" "$sink"
-    done < <(parse_markers <<<"$dump")
-    [[ -n $stream ]] && pin_route "$stream" "$app" "$sink"
+    # Nothing moves to an output that is not there right now; apply_pins
+    # routes to it once it appears.
+    sinks=" $(timeout 2 pactl -f json list sinks 2>/dev/null | jq -r '.[].name' | tr '\n' ' ') "
+    if [[ $sinks == *" $sink "* ]]; then
+      dump=$(metadata_dump)
+      routes=$(parse_routes <<<"$dump")
+      while IFS=$'\x1f' read -r id marked_app marked_sink; do
+        [[ $marked_sink != "$sink" && $(marker_app "$id" "$marked_app") == "$app" ]] || continue
+        routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
+        [[ $routed == "$marked_sink" ]] && pin_route "$id" "$app" "$sink"
+      done < <(parse_markers <<<"$dump")
+      [[ -n $stream ]] && pin_route "$stream" "$app" "$sink"
+    fi
     apply_pins
     ;;
 
   unpin)
     # Works from the markers alone (they carry the app), so it needs neither
     # pactl nor the pins file, and running it again finishes a reset that
-    # failed part way.
+    # failed part way. Only old sink-only markers need pactl for their app.
     app=${1:-}
     [[ -n $app ]] || usage
     [[ -f $pins_file ]] && awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
     dump=$(metadata_dump)
     routes=$(parse_routes <<<"$dump")
-    while IFS=$'\t' read -r id marked_app marked_sink; do
-      [[ $marked_app == "$app" ]] || continue
+    while IFS=$'\x1f' read -r id marked_app marked_sink; do
+      [[ $(marker_app "$id" "$marked_app") == "$app" ]] || continue
       routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
       if [[ $routed == "$marked_sink" ]]; then
         # Keep the marker if the reset fails, so a later unpin can retry.

@@ -58,8 +58,8 @@ expect() {
   else echo "not ok - $name"; echo "  want: $(printf %q "$want")"; echo "  got:  $(printf %q "$got")"; failures=$((failures + 1)); fi
 }
 
-target_of() { sed -n "s/^update: id:$1 key:'target.object' value:'\([^']*\)'.*/\1/p" "$FIX/metadata.txt"; }
-marker_of() { sed -n "s/^update: id:$1 key:'omaudiopanel.pin' value:'\([^']*\)'.*/\1/p" "$FIX/metadata.txt"; }
+target_of() { sed -n "s/^update: id:$1 key:'target.object' value:'\(.*\)' type:.*/\1/p" "$FIX/metadata.txt"; }
+marker_of() { sed -n "s/^update: id:$1 key:'omaudiopanel.pin' value:'\(.*\)' type:.*/\1/p" "$FIX/metadata.txt"; }
 
 setup
 "$helper" pin Brave speakers "Speakers"
@@ -173,13 +173,40 @@ expect "unpin ignores lookalike keys" "speakers" "$(target_of 61)"
 
 setup
 # Route-changing commands wait for each other through one lock.
-flock "$XDG_RUNTIME_DIR/omaudiopanel.lock" sleep 1 &
-sleep 0.2
+flock "$XDG_RUNTIME_DIR/omaudiopanel.lock" sh -c ': >"$1"; sleep 1' _ "$FIX/locked" &
+while [[ ! -e $FIX/locked ]]; do sleep 0.02; done
+rm -f "$FIX/locked"
 start=$(date +%s%N)
 "$helper" route 60 speakers
 waited=$(( ($(date +%s%N) - start) / 1000000 ))
 wait
 expect "route waits for the lock" "yes" "$( (( waited >= 600 )) && echo yes || echo "no (${waited}ms)")"
+
+setup
+# Re-pinning to an output that is not there leaves the routes where they are,
+# and does not route the stream on screen to it either.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+"$helper" pin Brave missing "Gone" 60
+expect "re-pin to a missing output keeps the routes" "speakers speakers" "$(target_of 60) $(target_of 61)"
+
+setup
+# App names can contain an apostrophe; pw-metadata prints it unescaped.
+cat >"$FIX/inputs.json" <<'JSON'
+[{"index":20,"sink":2,"corked":false,"properties":{"object.id":"80","application.name":"Baldur's Gate 3"}}]
+JSON
+"$helper" pin "Baldur's Gate 3" speakers "Speakers" >/dev/null
+expect "marker keeps an apostrophe in the app name" "Baldur's Gate 3|speakers" "$(marker_of 80)"
+"$helper" unpin "Baldur's Gate 3"
+expect "unpin works for an app name with an apostrophe" "" "$(target_of 80)$(marker_of 80)"
+
+setup
+# Markers from the previous version hold only the sink; unpin still resets them.
+mkdir -p "$XDG_STATE_HOME/omaudiopanel"
+printf 'Brave\tspeakers\tSpeakers\n' >"$XDG_STATE_HOME/omaudiopanel/pins"
+printf "update: id:60 key:'target.object' value:'speakers' type:'(null)'\nupdate: id:60 key:'omaudiopanel.pin' value:'speakers' type:'(null)'\nupdate: id:70 key:'target.object' value:'speakers' type:'(null)'\nupdate: id:70 key:'omaudiopanel.pin' value:'speakers' type:'(null)'\n" >"$FIX/metadata.txt"
+"$helper" unpin Brave
+expect "unpin resets a marker from the previous version" "" "$(target_of 60)$(marker_of 60)"
+expect "an old marker on another app's stream stays" "speakers speakers" "$(target_of 70) $(marker_of 70)"
 
 setup
 expect "list-streams reports app and paused state" \

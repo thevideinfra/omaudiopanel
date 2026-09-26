@@ -596,9 +596,11 @@ Panel {
     pinsCommand(["unpin", app])
   }
 
+  // Detached like route/unroute: a second click while the first still waits
+  // on the helper's lock must not be dropped. The helper's lock orders them.
   function pinsCommand(args) {
-    pinCommandProc.command = [helperPath].concat(args)
-    pinCommandProc.running = true
+    runHelper(args)
+    pinsRefreshTimer.restart()
   }
 
   // Tab titles for browser streams; see Model.streamTitles.
@@ -886,9 +888,13 @@ Panel {
     }
   }
 
-  Process {
-    id: pinCommandProc
-    onExited: streamsRefreshTimer.restart()
+  // Re-read pins and routes after a pin change, once the helper has had time
+  // to finish; the periodic refresh covers slower runs.
+  Timer {
+    id: pinsRefreshTimer
+    interval: 800
+    repeat: false
+    onTriggered: root.refreshHelperState()
   }
 
   Timer {
