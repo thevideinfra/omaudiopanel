@@ -583,7 +583,8 @@ Panel {
     var next = Object.assign({}, pins)
     next[app] = { sink: sinkName, label: label }
     pins = next
-    pinsCommand(["pin", app, sinkName, label])
+    // The stream on screen joins the pin, even if it was routed by hand.
+    pinsCommand(["pin", app, sinkName, label, String(stream.id)])
   }
 
   function unpinStream(stream) {
@@ -668,16 +669,21 @@ Panel {
     var name = sinkNode ? String(sinkNode.name) : ""
     var old = next[stream.id] || { current: "", app: "", paused: false }
     next[stream.id] = { current: name || old.current, routed: name, app: old.app, paused: old.paused }
-    if (sinkNode) runHelper(["route", String(stream.id), name])
-    else runHelper(["unroute", String(stream.id)])
     streamInfo = next
     streamsRefreshTimer.restart()
 
-    // A pin follows the chosen output; going back to the default ends it.
+    // For a pinned app the pin follows the chosen output, and "pin" routes this
+    // stream itself, so only one helper command runs; a separate "route" would
+    // mark this stream as set by hand. Going back to the default ends the pin.
     if (streamPin(stream)) {
-      if (sinkNode) pinStream(stream, name, nodeLabel(sinkNode))
-      else unpinStream(stream)
+      if (sinkNode) {
+        pinStream(stream, name, nodeLabel(sinkNode))
+        return
+      }
+      unpinStream(stream)
     }
+    if (sinkNode) runHelper(["route", String(stream.id), name])
+    else runHelper(["unroute", String(stream.id)])
   }
 
   // Keyboard: step default -> each output -> default.

@@ -8,7 +8,8 @@
 #   omaudiopanel enable <node-name>
 #   omaudiopanel list-streams                     id<TAB>current<TAB>routed<TAB>app<TAB>paused(0|1)
 #   omaudiopanel list-pins                        app<TAB>sink-name<TAB>sink-label
-#   omaudiopanel pin <app> <sink-name> <label>    always play <app> on that output
+#   omaudiopanel pin <app> <sink-name> <label> [stream-id]
+#                                                 always play <app> on that output
 #   omaudiopanel unpin <app>
 #   omaudiopanel apply-pins                       route new streams of pinned apps
 #   omaudiopanel route <stream-id> <sink-name>
@@ -30,15 +31,18 @@ set -u
 state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/omaudiopanel
 state_file=$state_dir/disabled-nodes
 pins_file=$state_dir/pins
-# A route a pin creates carries this metadata key, set to the pinned sink.
-# PipeWire drops a stream's metadata when the stream goes away, so the marker
-# can never outlive its stream or attach to a reused id. A route set by hand
-# clears the marker; unpin undoes only marked routes.
+# A route a pin creates carries this metadata key, valued "app|sink" (sink
+# names never contain "|"). PipeWire drops a stream's metadata when the stream
+# goes away, so the marker can never outlive its stream or attach to a reused
+# id. A route set by hand clears the marker; unpin undoes only marked routes.
 pin_marker=omaudiopanel.pin
+# Commands that change routes or pins take this lock, so the two panel
+# instances and back-to-back clicks cannot interleave their reads and writes.
+lock_file=${XDG_RUNTIME_DIR:-$state_dir}/omaudiopanel.lock
 shell_config=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json
 
 usage() {
-  sed -n '6,17p' "$0" | sed 's/^# \{0,3\}//' >&2
+  sed -n '6,18p' "$0" | sed 's/^# \{0,3\}//' >&2
   exit 1
 }
 
@@ -70,13 +74,38 @@ card_json() {
   timeout 2 pactl -f json list cards 2>/dev/null | jq -c --arg c "$1" '.[] | select(.name == $c)'
 }
 
-# id<TAB>routed-sink for every stream with a target in the default metadata.
-# WirePlumber writes -1 for "no specific target", which means the stream
-# follows the default, so it is not a route.
-stream_routes() {
-  timeout 2 pw-metadata 2>/dev/null \
-    | sed -n "s/^update: id:\([0-9]*\) key:'target\.object' value:'\([^']*\)'.*/\1\t\2/p" \
+metadata_dump() {
+  timeout 2 pw-metadata 2>/dev/null
+}
+
+# id<TAB>routed-sink for every stream with a target, from a metadata dump on
+# stdin. WirePlumber writes -1 for "no specific target", which means the
+# stream follows the default, so it is not a route.
+parse_routes() {
+  sed -n "s/^update: id:\([0-9]*\) key:'target\.object' value:'\([^']*\)'.*/\1\t\2/p" \
     | awk -F'\t' '$2 != "" && $2 != "-1"'
+}
+
+# id<TAB>app<TAB>sink for every pin marker, from a metadata dump on stdin.
+parse_markers() {
+  sed -n "s/^update: id:\([0-9]*\) key:'omaudiopanel\.pin' value:'\([^']*\)'.*/\1\t\2/p" \
+    | awk -F'\t' '{
+        n = split($2, part, "|"); sink = part[n]
+        if (n < 2 || sink == "") next
+        print $1 "\t" substr($2, 1, length($2) - length(sink) - 1) "\t" sink
+      }'
+}
+
+stream_routes() {
+  metadata_dump | parse_routes
+}
+
+# Route a stream for a pin and mark it; the marker is written only once the
+# route itself is set.
+pin_route() {
+  local id=$1 app=$2 sink=$3
+  timeout 2 pw-metadata "$id" target.object "$sink" >/dev/null \
+    && timeout 2 pw-metadata "$id" "$pin_marker" "$app|$sink" >/dev/null
 }
 
 # id<TAB>app for every application playback stream.
@@ -84,12 +113,6 @@ stream_apps() {
   timeout 2 pactl -f json list sink-inputs 2>/dev/null \
     | jq -r '.[] | select(.properties["object.id"] != null and .properties["application.name"] != null)
         | "\(.properties["object.id"])\t\(.properties["application.name"])"'
-}
-
-# id<TAB>sink for every stream whose route a pin created.
-pin_markers() {
-  timeout 2 pw-metadata 2>/dev/null \
-    | sed -n "s/^update: id:\([0-9]*\) key:'$pin_marker' value:'\([^']*\)'.*/\1\t\2/p"
 }
 
 apply_pins() {
@@ -101,9 +124,7 @@ apply_pins() {
     pin=$(awk -F'\t' -v a="$app" '$1 == a { print $2; exit }' "$pins_file")
     [[ -n $pin && $sinks == *" $pin "* ]] || continue
     awk -F'\t' -v id="$id" '$1 == id { found = 1 } END { exit !found }' <<<"$routes" && continue
-    # Mark the route only once it is really set.
-    timeout 2 pw-metadata "$id" target.object "$pin" >/dev/null \
-      && timeout 2 pw-metadata "$id" "$pin_marker" "$pin" >/dev/null
+    pin_route "$id" "$app" "$pin"
   done < <(stream_apps)
 }
 
@@ -116,6 +137,14 @@ routed_stream_ids() {
 
 cmd=${1:-}
 shift || true
+
+case $cmd in
+  pin | unpin | apply-pins | route | unroute | set-default-sink)
+    mkdir -p "$(dirname "$lock_file")"
+    exec 9>"$lock_file"
+    flock -w 10 9 || { echo "omaudiopanel: could not take $lock_file" >&2; exit 1; }
+    ;;
+esac
 
 case $cmd in
   list-disabled)
@@ -218,36 +247,45 @@ case $cmd in
     ;;
 
   pin)
-    app=${1:-} sink=${2:-} label=${3:-}
+    # pin <app> <sink> <label> [stream-id]: stream-id is the stream the user is
+    # looking at; it joins the pin even if it was routed by hand.
+    app=${1:-} sink=${2:-} label=${3:-} stream=${4:-}
     [[ -n $app && -n $sink ]] || usage
     mkdir -p "$state_dir"
     [[ -f $pins_file ]] && awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
     printf '%s\t%s\t%s\n' "$app" "$sink" "${label:-$sink}" >>"$pins_file"
+    # Re-pinning moves the pin's own routes (still on their marked output) to
+    # the new output; routes set by hand stay.
+    dump=$(metadata_dump)
+    routes=$(parse_routes <<<"$dump")
+    while IFS=$'\t' read -r id marked_app marked_sink; do
+      [[ $marked_app == "$app" && $marked_sink != "$sink" ]] || continue
+      routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
+      [[ $routed == "$marked_sink" ]] && pin_route "$id" "$app" "$sink"
+    done < <(parse_markers <<<"$dump")
+    [[ -n $stream ]] && pin_route "$stream" "$app" "$sink"
     apply_pins
     ;;
 
   unpin)
+    # Works from the markers alone (they carry the app), so it needs neither
+    # pactl nor the pins file, and running it again finishes a reset that
+    # failed part way.
     app=${1:-}
     [[ -n $app ]] || usage
-    [[ -f $pins_file ]] || exit 0
-    pin=$(awk -F'\t' -v a="$app" '$1 == a { print $2; exit }' "$pins_file")
-    awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
-    [[ -n $pin ]] || exit 0
-    # Undo only routes this pin created (marked, for this app) that still
-    # point at the pinned output. Routes set by hand carry no marker.
-    routes=$(stream_routes)
-    apps=$(stream_apps)
-    while IFS=$'\t' read -r id marked_sink; do
-      [[ $marked_sink == "$pin" ]] || continue
-      stream_app=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$apps")
-      [[ $stream_app == "$app" ]] || continue
+    [[ -f $pins_file ]] && awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
+    dump=$(metadata_dump)
+    routes=$(parse_routes <<<"$dump")
+    while IFS=$'\t' read -r id marked_app marked_sink; do
+      [[ $marked_app == "$app" ]] || continue
       routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
-      if [[ $routed == "$pin" ]]; then
-        timeout 2 pw-metadata -d "$id" target.object >/dev/null
+      if [[ $routed == "$marked_sink" ]]; then
+        # Keep the marker if the reset fails, so a later unpin can retry.
+        timeout 2 pw-metadata -d "$id" target.object >/dev/null || continue
         timeout 2 pw-metadata -d "$id" target.node >/dev/null
       fi
       timeout 2 pw-metadata -d "$id" "$pin_marker" >/dev/null
-    done < <(pin_markers)
+    done < <(parse_markers <<<"$dump")
     ;;
 
   apply-pins)

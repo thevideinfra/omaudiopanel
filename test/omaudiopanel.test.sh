@@ -8,7 +8,8 @@ helper=$here/../bin/omaudiopanel
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-export XDG_STATE_HOME=$work/state XDG_CONFIG_HOME=$work/config
+export XDG_STATE_HOME=$work/state XDG_CONFIG_HOME=$work/config XDG_RUNTIME_DIR=$work/run
+mkdir -p "$work/run"
 mkdir -p "$work/bin"
 export PATH=$work/bin:$PATH
 failures=0
@@ -18,7 +19,7 @@ cat >"$work/bin/pactl" <<'EOF'
 #!/bin/bash
 case "$*" in
   "-f json list sinks") cat "$FIX/sinks.json" ;;
-  "-f json list sink-inputs") cat "$FIX/inputs.json" ;;
+  "-f json list sink-inputs") [[ -e $FIX/fail-pactl ]] && exit 1; cat "$FIX/inputs.json" ;;
   "-f json list cards") cat "$FIX/cards.json" ;;
   set-card-profile*) echo "$*" >>"$FIX/writes.log" ;;
 esac
@@ -42,7 +43,7 @@ chmod +x "$work/bin/"*
 export FIX=$work
 
 setup() {
-  rm -rf "$XDG_STATE_HOME" "$FIX/fail-writes"; : >"$FIX/writes.log"; : >"$FIX/metadata.txt"
+  rm -rf "$XDG_STATE_HOME" "$FIX/fail-writes" "$FIX/fail-pactl"; : >"$FIX/writes.log"; : >"$FIX/metadata.txt"
   echo '[{"index":1,"name":"speakers"},{"index":2,"name":"headset"}]' >"$FIX/sinks.json"
   cat >"$FIX/inputs.json" <<'EOF'
 [{"index":10,"sink":2,"corked":false,"properties":{"object.id":"60","object.serial":"160","application.name":"Brave"}},
@@ -63,15 +64,14 @@ marker_of() { sed -n "s/^update: id:$1 key:'omaudiopanel.pin' value:'\([^']*\)'.
 setup
 "$helper" pin Brave speakers "Speakers"
 expect "pin saves app, sink and label" $'Brave\tspeakers\tSpeakers' "$("$helper" list-pins)"
-expect "pin routes and marks the app's unrouted streams" \
-  $'60 target.object speakers\n60 omaudiopanel.pin speakers\n61 target.object speakers\n61 omaudiopanel.pin speakers' \
-  "$(cat "$FIX/writes.log")"
+expect "pin routes the app's unrouted streams" "speakers speakers" "$(target_of 60) $(target_of 61)"
+expect "pin marks its routes with app and sink" "Brave|speakers Brave|speakers" "$(marker_of 60) $(marker_of 61)"
 
 setup
 echo "update: id:61 key:'target.object' value:'headset' type:'(null)'" >"$FIX/metadata.txt"
 "$helper" pin Brave speakers "Speakers" >/dev/null
-expect "apply-pins leaves streams routed by hand" \
-  $'60 target.object speakers\n60 omaudiopanel.pin speakers' "$(cat "$FIX/writes.log")"
+expect "apply-pins leaves streams routed by hand" "speakers headset" "$(target_of 60) $(target_of 61)"
+expect "apply-pins marks only its own routes" "Brave|speakers " "$(marker_of 60) $(marker_of 61)"
 
 setup
 "$helper" pin Brave missing "Gone"
@@ -81,6 +81,25 @@ setup
 "$helper" pin Brave speakers "Speakers"
 "$helper" pin Brave headset "Headset"
 expect "re-pinning replaces the old pin" $'Brave\theadset\tHeadset' "$("$helper" list-pins)"
+expect "re-pinning moves the pin's routes to the new output" "headset headset" "$(target_of 60) $(target_of 61)"
+expect "re-pinning re-marks them" "Brave|headset Brave|headset" "$(marker_of 60) $(marker_of 61)"
+
+setup
+# Picking an output for a stream, then ticking "Always play": the stream the
+# user is looking at joins the pin, so unticking returns it to the default.
+"$helper" route 60 speakers
+"$helper" pin Brave speakers "Speakers" 60
+expect "pin adopts the given stream" "Brave|speakers" "$(marker_of 60)"
+"$helper" unpin Brave
+expect "unpin returns an adopted stream to the default" "" "$(target_of 60)"
+
+setup
+# Choosing another output for a pinned stream moves the pin with it; the
+# stream stays part of the pin.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+"$helper" pin Brave headset "Headset" 60
+expect "pin with a stream routes it to the new output" "headset" "$(target_of 60)"
+expect "that stream stays marked" "Brave|headset" "$(marker_of 60)"
 
 setup
 touch "$FIX/fail-writes"
@@ -114,7 +133,7 @@ setup
 "$helper" pin Brave speakers "Speakers" >/dev/null
 "$helper" pin Firefox speakers "Speakers" >/dev/null
 "$helper" unpin Brave
-expect "unpin leaves other apps' pin routes" "speakers speakers" "$(target_of 70) $(marker_of 70)"
+expect "unpin leaves other apps' pin routes" "speakers Firefox|speakers" "$(target_of 70) $(marker_of 70)"
 
 setup
 # A failed hand route keeps the pin's marker, so unpin can still undo the route.
@@ -124,6 +143,43 @@ touch "$FIX/fail-writes"
 rm "$FIX/fail-writes"
 "$helper" unpin Brave
 expect "a failed hand route does not orphan the pin's route" "" "$(target_of 61)"
+
+setup
+# If resetting a route fails, the marker stays, and unpinning again (with the
+# pin already gone) still finishes the job.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+touch "$FIX/fail-writes"
+"$helper" unpin Brave
+rm "$FIX/fail-writes"
+expect "a failed reset keeps the marker" "Brave|speakers" "$(marker_of 60)"
+"$helper" unpin Brave
+expect "unpin again finishes the reset" "" "$(target_of 60)$(marker_of 60)"
+
+setup
+# unpin reads the app from the marker, so it does not need pactl.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+touch "$FIX/fail-pactl"
+"$helper" unpin Brave
+rm "$FIX/fail-pactl"
+expect "unpin works when pactl fails" "" "$(target_of 60)$(target_of 61)"
+
+setup
+# Only the exact key counts as a marker.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+"$helper" route 61 speakers
+echo "update: id:61 key:'omaudiopanelXpin' value:'Brave|speakers' type:'(null)'" >>"$FIX/metadata.txt"
+"$helper" unpin Brave
+expect "unpin ignores lookalike keys" "speakers" "$(target_of 61)"
+
+setup
+# Route-changing commands wait for each other through one lock.
+flock "$XDG_RUNTIME_DIR/omaudiopanel.lock" sleep 1 &
+sleep 0.2
+start=$(date +%s%N)
+"$helper" route 60 speakers
+waited=$(( ($(date +%s%N) - start) / 1000000 ))
+wait
+expect "route waits for the lock" "yes" "$( (( waited >= 600 )) && echo yes || echo "no (${waited}ms)")"
 
 setup
 expect "list-streams reports app and paused state" \
