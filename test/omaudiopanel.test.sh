@@ -25,19 +25,29 @@ esac
 EOF
 cat >"$work/bin/pw-metadata" <<'EOF'
 #!/bin/bash
-if [[ $# -eq 0 ]]; then cat "$FIX/metadata.txt"; exit 0; fi
+# Behaves like the default metadata: writes replace the entry, -d removes it,
+# and a later read shows the result. $FIX/fail-writes makes every write fail.
+m=$FIX/metadata.txt
+if [[ $# -eq 0 ]]; then cat "$m"; exit 0; fi
+[[ -e $FIX/fail-writes ]] && exit 1
 echo "$*" >>"$FIX/writes.log"
+if [[ $1 == -d ]]; then
+  grep -v "^update: id:$2 key:'$3' " "$m" >"$m.tmp"; mv "$m.tmp" "$m"
+else
+  grep -v "^update: id:$1 key:'$2' " "$m" >"$m.tmp"; mv "$m.tmp" "$m"
+  echo "update: id:$1 key:'$2' value:'$3' type:'(null)'" >>"$m"
+fi
 EOF
 chmod +x "$work/bin/"*
 export FIX=$work
 
 setup() {
-  rm -rf "$XDG_STATE_HOME"; : >"$FIX/writes.log"; : >"$FIX/metadata.txt"
+  rm -rf "$XDG_STATE_HOME" "$FIX/fail-writes"; : >"$FIX/writes.log"; : >"$FIX/metadata.txt"
   echo '[{"index":1,"name":"speakers"},{"index":2,"name":"headset"}]' >"$FIX/sinks.json"
   cat >"$FIX/inputs.json" <<'EOF'
-[{"index":10,"sink":2,"corked":false,"properties":{"object.id":"60","application.name":"Brave"}},
- {"index":11,"sink":2,"corked":true,"properties":{"object.id":"61","application.name":"Brave"}},
- {"index":12,"sink":2,"corked":false,"properties":{"object.id":"70","application.name":"Firefox"}}]
+[{"index":10,"sink":2,"corked":false,"properties":{"object.id":"60","object.serial":"160","application.name":"Brave"}},
+ {"index":11,"sink":2,"corked":true,"properties":{"object.id":"61","object.serial":"161","application.name":"Brave"}},
+ {"index":12,"sink":2,"corked":false,"properties":{"object.id":"70","object.serial":"170","application.name":"Firefox"}}]
 EOF
 }
 
@@ -47,17 +57,21 @@ expect() {
   else echo "not ok - $name"; echo "  want: $(printf %q "$want")"; echo "  got:  $(printf %q "$got")"; failures=$((failures + 1)); fi
 }
 
+target_of() { sed -n "s/^update: id:$1 key:'target.object' value:'\([^']*\)'.*/\1/p" "$FIX/metadata.txt"; }
+marker_of() { sed -n "s/^update: id:$1 key:'omaudiopanel.pin' value:'\([^']*\)'.*/\1/p" "$FIX/metadata.txt"; }
+
 setup
 "$helper" pin Brave speakers "Speakers"
 expect "pin saves app, sink and label" $'Brave\tspeakers\tSpeakers' "$("$helper" list-pins)"
-expect "pin routes the app's unrouted streams" $'60 target.object speakers\n61 target.object speakers' "$(cat "$FIX/writes.log")"
+expect "pin routes and marks the app's unrouted streams" \
+  $'60 target.object speakers\n60 omaudiopanel.pin speakers\n61 target.object speakers\n61 omaudiopanel.pin speakers' \
+  "$(cat "$FIX/writes.log")"
 
 setup
-"$helper" pin Brave speakers "Speakers" >/dev/null
-: >"$FIX/writes.log"
 echo "update: id:61 key:'target.object' value:'headset' type:'(null)'" >"$FIX/metadata.txt"
-"$helper" apply-pins
-expect "apply-pins leaves streams routed by hand" "60 target.object speakers" "$(cat "$FIX/writes.log")"
+"$helper" pin Brave speakers "Speakers" >/dev/null
+expect "apply-pins leaves streams routed by hand" \
+  $'60 target.object speakers\n60 omaudiopanel.pin speakers' "$(cat "$FIX/writes.log")"
 
 setup
 "$helper" pin Brave missing "Gone"
@@ -69,12 +83,47 @@ setup
 expect "re-pinning replaces the old pin" $'Brave\theadset\tHeadset' "$("$helper" list-pins)"
 
 setup
+touch "$FIX/fail-writes"
 "$helper" pin Brave speakers "Speakers" >/dev/null
-printf "update: id:60 key:'target.object' value:'speakers' type:'(null)'\nupdate: id:61 key:'target.object' value:'headset' type:'(null)'\n" >"$FIX/metadata.txt"
-: >"$FIX/writes.log"
+rm "$FIX/fail-writes"
+expect "a failed route write leaves no marker" "" "$(marker_of 60)$(marker_of 61)"
+
+setup
+"$helper" pin Brave speakers "Speakers" >/dev/null
 "$helper" unpin Brave
 expect "unpin removes the pin" "" "$("$helper" list-pins)"
-expect "unpin returns only pinned streams to default" $'-d 60 target.object\n-d 60 target.node' "$(cat "$FIX/writes.log")"
+expect "unpin returns the pin's streams to the default" "" "$(target_of 60)$(target_of 61)$(marker_of 60)$(marker_of 61)"
+
+setup
+# A stream routed by hand to the pin's own output is a manual route: unpinning
+# must leave it, and reset only the routes the pin created.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+"$helper" route 61 speakers
+"$helper" unpin Brave
+expect "unpin resets the pin's route" "" "$(target_of 60)"
+expect "unpin keeps a manual route to the pinned output" "speakers" "$(target_of 61)"
+
+setup
+"$helper" pin Brave speakers "Speakers" >/dev/null
+"$helper" route 61 headset
+"$helper" unpin Brave
+expect "unpin keeps a manual reroute" "headset" "$(target_of 61)"
+
+setup
+# Another app pinned to the same output keeps its routes when Brave is unpinned.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+"$helper" pin Firefox speakers "Speakers" >/dev/null
+"$helper" unpin Brave
+expect "unpin leaves other apps' pin routes" "speakers speakers" "$(target_of 70) $(marker_of 70)"
+
+setup
+# A failed hand route keeps the pin's marker, so unpin can still undo the route.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+touch "$FIX/fail-writes"
+"$helper" route 61 headset
+rm "$FIX/fail-writes"
+"$helper" unpin Brave
+expect "a failed hand route does not orphan the pin's route" "" "$(target_of 61)"
 
 setup
 expect "list-streams reports app and paused state" \
@@ -87,8 +136,7 @@ printf "update: id:60 key:'target.object' value:'-1' type:'Spa:Id'\nupdate: id:6
 expect "list-streams treats a -1 target as following the default" \
   $'60\theadset\t\tBrave\t0' "$("$helper" list-streams | head -1)"
 "$helper" pin Brave speakers "Speakers" >/dev/null
-expect "apply-pins routes a stream whose target is -1" \
-  $'60 target.object speakers\n61 target.object speakers' "$(cat "$FIX/writes.log")"
+expect "apply-pins routes a stream whose target is -1" "speakers speakers" "$(target_of 60) $(target_of 61)"
 
 setup
 # Bluetooth nodes have no device.profile.name and their card profiles are

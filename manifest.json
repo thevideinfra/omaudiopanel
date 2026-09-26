@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "videinfra.omaudiopanel",
   "name": "omaudiopanel",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": "thevideinfra",
   "license": "MIT",
   "description": "Omarchy's audio panel plus device disabling, per-app output routing and pinning, tab titles and an adjustable volume step",

@@ -136,7 +136,10 @@ lives in `bin/omaudiopanel`, a small script the panel calls:
   target is missing, and relinks when it returns.
 - **Pins** are kept in `~/.local/state/omaudiopanel/pins`. The panel applies
   them whenever a stream or output appears, whether or not it is open. Streams
-  you route by hand are left alone.
+  you route by hand are left alone. A route a pin creates is marked with an
+  `omaudiopanel.pin` key in the stream's own PipeWire metadata, which goes away
+  with the stream; removing the pin undoes only marked routes, so a stream you
+  sent to the same output by hand keeps its route.
 - **Tab titles** come from the MPRIS players browsers publish per tab. A
   browser's streams all share one process, so a stream is matched to a tab only
   when that is certain: one stream and one player, or one playing stream and

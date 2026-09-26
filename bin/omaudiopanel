@@ -30,6 +30,11 @@ set -u
 state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/omaudiopanel
 state_file=$state_dir/disabled-nodes
 pins_file=$state_dir/pins
+# A route a pin creates carries this metadata key, set to the pinned sink.
+# PipeWire drops a stream's metadata when the stream goes away, so the marker
+# can never outlive its stream or attach to a reused id. A route set by hand
+# clears the marker; unpin undoes only marked routes.
+pin_marker=omaudiopanel.pin
 shell_config=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json
 
 usage() {
@@ -81,6 +86,12 @@ stream_apps() {
         | "\(.properties["object.id"])\t\(.properties["application.name"])"'
 }
 
+# id<TAB>sink for every stream whose route a pin created.
+pin_markers() {
+  timeout 2 pw-metadata 2>/dev/null \
+    | sed -n "s/^update: id:\([0-9]*\) key:'$pin_marker' value:'\([^']*\)'.*/\1\t\2/p"
+}
+
 apply_pins() {
   [[ -s $pins_file ]] || return 0
   local sinks routes id app pin
@@ -90,7 +101,9 @@ apply_pins() {
     pin=$(awk -F'\t' -v a="$app" '$1 == a { print $2; exit }' "$pins_file")
     [[ -n $pin && $sinks == *" $pin "* ]] || continue
     awk -F'\t' -v id="$id" '$1 == id { found = 1 } END { exit !found }' <<<"$routes" && continue
-    timeout 2 pw-metadata "$id" target.object "$pin" >/dev/null
+    # Mark the route only once it is really set.
+    timeout 2 pw-metadata "$id" target.object "$pin" >/dev/null \
+      && timeout 2 pw-metadata "$id" "$pin_marker" "$pin" >/dev/null
   done < <(stream_apps)
 }
 
@@ -220,17 +233,21 @@ case $cmd in
     pin=$(awk -F'\t' -v a="$app" '$1 == a { print $2; exit }' "$pins_file")
     awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
     [[ -n $pin ]] || exit 0
-    # Streams the pin put on that output go back to the default; streams
-    # routed elsewhere by hand stay where they are.
+    # Undo only routes this pin created (marked, for this app) that still
+    # point at the pinned output. Routes set by hand carry no marker.
     routes=$(stream_routes)
-    while IFS=$'\t' read -r id stream_app; do
+    apps=$(stream_apps)
+    while IFS=$'\t' read -r id marked_sink; do
+      [[ $marked_sink == "$pin" ]] || continue
+      stream_app=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$apps")
       [[ $stream_app == "$app" ]] || continue
       routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
       if [[ $routed == "$pin" ]]; then
         timeout 2 pw-metadata -d "$id" target.object >/dev/null
         timeout 2 pw-metadata -d "$id" target.node >/dev/null
       fi
-    done < <(stream_apps)
+      timeout 2 pw-metadata -d "$id" "$pin_marker" >/dev/null
+    done < <(pin_markers)
     ;;
 
   apply-pins)
@@ -240,7 +257,10 @@ case $cmd in
   route)
     id=${1:-} sink=${2:-}
     [[ -n $id && -n $sink ]] || usage
-    timeout 2 pw-metadata "$id" target.object "$sink" >/dev/null
+    # A route set by hand is not the pin's, so it drops the marker, but only
+    # once the new route is really in place.
+    timeout 2 pw-metadata "$id" target.object "$sink" >/dev/null \
+      && timeout 2 pw-metadata -d "$id" "$pin_marker" >/dev/null
     ;;
 
   unroute)
@@ -248,6 +268,7 @@ case $cmd in
     [[ -n $id ]] || usage
     timeout 2 pw-metadata -d "$id" target.object >/dev/null
     timeout 2 pw-metadata -d "$id" target.node >/dev/null
+    timeout 2 pw-metadata -d "$id" "$pin_marker" >/dev/null
     ;;
 
   set-default-sink)
