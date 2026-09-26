@@ -153,7 +153,7 @@ apply_pins() {
   local routes id app pin
   routes=$(stream_routes)
   while IFS=$'\t' read -r id app; do
-    pin=$(awk -F'\t' -v a="$app" '$1 == a { print $2; exit }' "$pins_file")
+    pin=$(A=$app awk -F'\t' '$1 == ENVIRON["A"] { print $2; exit }' "$pins_file")
     [[ -n $pin && -z $(value_of "$id" "$routes") ]] || continue
     pin_route "$id" "$app" "$pin"
   done < <(stream_apps)
@@ -283,7 +283,7 @@ case $cmd in
     app=${1:-} sink=${2:-} label=${3:-} stream=${4:-}
     [[ -n $app && -n $sink ]] || usage
     mkdir -p "$state_dir"
-    [[ -f $pins_file ]] && awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
+    [[ -f $pins_file ]] && A=$app awk -F'\t' '$1 != ENVIRON["A"]' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
     printf '%s\t%s\t%s\n' "$app" "$sink" "${label:-$sink}" >>"$pins_file"
     # Re-pinning moves the pin's own routes (still on their marked output) to
     # the new output, plugged in or not; routes set by hand stay.
@@ -295,7 +295,14 @@ case $cmd in
       [[ $(marker_app "$id" "$marked_app") == "$app" ]] || continue
       [[ $(value_of "$id" "$routes") == "$marked_sink" ]] && pin_route "$id" "$app" "$sink"
     done <<<"$markers"
-    [[ -n $stream ]] && pin_route "$stream" "$app" "$sink"
+    # The id on screen may meanwhile belong to another app's stream; only adopt
+    # it if it is still this app's (or if pactl cannot say).
+    if [[ -n $stream ]]; then
+      apps=$(stream_apps)
+      if [[ -z $apps || $(value_of "$stream" "$apps") == "$app" ]]; then
+        pin_route "$stream" "$app" "$sink"
+      fi
+    fi
     apply_pins
     ;;
 
@@ -305,8 +312,10 @@ case $cmd in
     # failed part way. Only old sink-only markers need pactl for their app.
     app=${1:-}
     [[ -n $app ]] || usage
-    [[ -f $pins_file ]] && awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
-    dump=$(metadata_dump)
+    # Read the metadata first: if that fails, change nothing, so the pin is
+    # still listed and can be removed again from the panel.
+    dump=$(metadata_dump) || { echo "omaudiopanel: could not read PipeWire metadata" >&2; exit 1; }
+    [[ -f $pins_file ]] && A=$app awk -F'\t' '$1 != ENVIRON["A"]' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
     routes=$(parse_routes <<<"$dump")
     load_markers "$dump"
     while IFS=$'\x1f' read -r id marked_app marked_sink; do

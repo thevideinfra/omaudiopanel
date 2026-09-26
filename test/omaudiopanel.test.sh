@@ -29,7 +29,7 @@ cat >"$work/bin/pw-metadata" <<'EOF'
 # Behaves like the default metadata: writes replace the entry, -d removes it,
 # and a later read shows the result. $FIX/fail-writes makes every write fail.
 m=$FIX/metadata.txt
-if [[ $# -eq 0 ]]; then cat "$m"; exit 0; fi
+if [[ $# -eq 0 ]]; then [[ -e $FIX/fail-reads ]] && exit 1; cat "$m"; exit 0; fi
 [[ -e $FIX/fail-writes ]] && exit 1
 echo "$*" >>"$FIX/writes.log"
 if [[ $1 == -d ]]; then
@@ -43,7 +43,7 @@ chmod +x "$work/bin/"*
 export FIX=$work
 
 setup() {
-  rm -rf "$XDG_STATE_HOME" "$FIX/fail-writes" "$FIX/fail-pactl" "$FIX/fail-sinks" "$FIX/sink-input-calls"; : >"$FIX/writes.log"; : >"$FIX/metadata.txt"
+  rm -rf "$XDG_STATE_HOME" "$FIX/fail-writes" "$FIX/fail-pactl" "$FIX/fail-sinks" "$FIX/sink-input-calls" "$FIX/fail-reads"; : >"$FIX/writes.log"; : >"$FIX/metadata.txt"
   echo '[{"index":1,"name":"speakers"},{"index":2,"name":"headset"}]' >"$FIX/sinks.json"
   cat >"$FIX/inputs.json" <<'EOF'
 [{"index":10,"sink":2,"corked":false,"properties":{"object.id":"60","object.serial":"160","application.name":"Brave"}},
@@ -231,6 +231,31 @@ printf "update: id:60 key:'target.object' value:'speakers' type:'(null)'\nupdate
 "$helper" unpin Brave
 expect "unpin resets a marker from the previous version" "" "$(target_of 60)$(marker_of 60)"
 expect "an old marker on another app's stream stays" "speakers speakers" "$(target_of 70) $(marker_of 70)"
+
+setup
+# If the metadata cannot be read, unpin changes nothing, so the pin is still
+# there to remove again from the panel.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+touch "$FIX/fail-reads"
+"$helper" unpin Brave
+rm "$FIX/fail-reads"
+expect "unpin keeps the pin when metadata cannot be read" $'Brave\tspeakers\tSpeakers' "$("$helper" list-pins)"
+expect "and the routes stay marked" "Brave|speakers" "$(marker_of 60)"
+
+setup
+# The stream id on screen may have been reused by another app's stream.
+"$helper" pin Brave speakers "Speakers" 70
+expect "pin does not adopt another app's stream" "" "$(marker_of 70)"
+
+setup
+# App names are compared literally, backslashes included.
+cat >"$FIX/inputs.json" <<'JSON'
+[{"index":20,"sink":2,"corked":false,"properties":{"object.id":"80","application.name":"Game\\Launcher"}}]
+JSON
+"$helper" pin 'Game\Launcher' speakers "Speakers" >/dev/null
+expect "apply-pins matches an app name with a backslash" "speakers" "$(target_of 80)"
+"$helper" unpin 'Game\Launcher'
+expect "unpin removes a pin whose app has a backslash" "" "$("$helper" list-pins)"
 
 setup
 expect "list-streams reports app and paused state" \

@@ -557,10 +557,17 @@ Panel {
     helperQueueProc.running = true
   }
 
+  // A read already in flight may have started before the latest change, so
+  // it is marked stale and run once more when it finishes.
+  property bool streamsStale: false
+  property bool pinsStale: false
+
   function refreshHelperState() {
     if (!disabledListProc.running) disabledListProc.running = true
-    if (!streamsProc.running) streamsProc.running = true
-    if (!pinsProc.running) pinsProc.running = true
+    if (streamsProc.running) streamsStale = true
+    else streamsProc.running = true
+    if (pinsProc.running) pinsStale = true
+    else pinsProc.running = true
   }
 
   // ---- Pins: always play an app on one output ----
@@ -892,6 +899,10 @@ Panel {
   Process {
     id: pinsProc
     command: [root.helperPath, "list-pins"]
+    onRunningChanged: if (!running && root.pinsStale) {
+      root.pinsStale = false
+      Qt.callLater(function() { pinsProc.running = true })
+    }
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.pins = Model.parsePins(text)
@@ -900,21 +911,14 @@ Panel {
 
   Process {
     id: helperQueueProc
-    onExited: {
+    // runningChanged fires both when a command exits and when it fails to
+    // start (exited does not fire then), so the queue never stalls.
+    onRunningChanged: if (!running) {
       if (root.helperQueue.length > 0) Qt.callLater(root.runNextHelper)
-      else helperSettledTimer.restart()
+      else root.refreshHelperState()
     }
   }
 
-  // Once the queue is empty, re-read what the helper changed. The short delay
-  // lets an earlier read that is still in flight finish first, so this read
-  // sees the final state.
-  Timer {
-    id: helperSettledTimer
-    interval: 150
-    repeat: false
-    onTriggered: root.refreshHelperState()
-  }
 
   Timer {
     id: pinApplyTimer
@@ -928,6 +932,10 @@ Panel {
   Process {
     id: streamsProc
     command: [root.helperPath, "list-streams"]
+    onRunningChanged: if (!running && root.streamsStale) {
+      root.streamsStale = false
+      Qt.callLater(function() { streamsProc.running = true })
+    }
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.streamInfo = Model.parseStreams(text)
