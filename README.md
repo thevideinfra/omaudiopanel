@@ -1,6 +1,6 @@
 # omaudiopanel
 
-Omarchy's audio panel, with the controls it was missing.
+Omarchy's audio panel, with the controls it was missing. Drop-in replacement. Follows Omarchy themes.
 
 <p>
   <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: playing bars and a mute switch on OUTPUT and INPUT, a Bluetooth speaker marked as such, Brave in the mixer with its output field and mute switch, the folded Disabled section and the volume step" width="360">
@@ -22,15 +22,14 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
 - **Mute one side.** OUTPUT and INPUT each have their own switch; the one in
   the header still mutes both.
 - **Choose where each app plays.** Under every app in the mixer, a
-  "Playing on CORSAIR HS80" field shows its output. Click it to pick another
+  "Playing on..." field shows its output. Click it to pick another
   (or press `r` to step through outputs). The switch beside it mutes the app.
-- **Pin an app to an output.** In that picker, tick **Always play Brave on
-  USB AUDIO CODEC** — the output you picked, or the one it is playing on. Every
+- **Pin an app to an output.** In that picker, tick **Always play Brave on...** — the output you picked, or the one it is playing on. Every
   new Brave stream goes there. If the output disappears,
   Brave falls back to the default and moves back when the output returns.
 - **Tell browser tabs apart.** Chromium-based browsers name every stream
   "Playback". When it can tell for certain, the mixer shows the tab instead:
-  "Brave – Lions vs Bills Highlights". Otherwise it numbers them: "Brave · 1 of 2".
+  "Brave – VIDEO/AUDIO titles". Otherwise it numbers them: "Brave · 1 of 2".
 - **See what is playing.** Small equalizer bars move next to OUTPUT and
   beside each app that is making sound, in your theme's accent colour — as do
   the volume sliders, level meters and the device in use.
