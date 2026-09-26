@@ -18,8 +18,8 @@ failures=0
 cat >"$work/bin/pactl" <<'EOF'
 #!/bin/bash
 case "$*" in
-  "-f json list sinks") cat "$FIX/sinks.json" ;;
-  "-f json list sink-inputs") [[ -e $FIX/fail-pactl ]] && exit 1; cat "$FIX/inputs.json" ;;
+  "-f json list sinks") [[ -e $FIX/fail-sinks ]] && exit 1; cat "$FIX/sinks.json" ;;
+  "-f json list sink-inputs") echo x >>"$FIX/sink-input-calls"; [[ -e $FIX/fail-pactl ]] && exit 1; cat "$FIX/inputs.json" ;;
   "-f json list cards") cat "$FIX/cards.json" ;;
   set-card-profile*) echo "$*" >>"$FIX/writes.log" ;;
 esac
@@ -43,7 +43,7 @@ chmod +x "$work/bin/"*
 export FIX=$work
 
 setup() {
-  rm -rf "$XDG_STATE_HOME" "$FIX/fail-writes" "$FIX/fail-pactl"; : >"$FIX/writes.log"; : >"$FIX/metadata.txt"
+  rm -rf "$XDG_STATE_HOME" "$FIX/fail-writes" "$FIX/fail-pactl" "$FIX/fail-sinks" "$FIX/sink-input-calls"; : >"$FIX/writes.log"; : >"$FIX/metadata.txt"
   echo '[{"index":1,"name":"speakers"},{"index":2,"name":"headset"}]' >"$FIX/sinks.json"
   cat >"$FIX/inputs.json" <<'EOF'
 [{"index":10,"sink":2,"corked":false,"properties":{"object.id":"60","object.serial":"160","application.name":"Brave"}},
@@ -74,8 +74,10 @@ expect "apply-pins leaves streams routed by hand" "speakers headset" "$(target_o
 expect "apply-pins marks only its own routes" "Brave|speakers " "$(marker_of 60) $(marker_of 61)"
 
 setup
+# An unplugged pinned output still gets the route: WirePlumber plays the
+# stream on the default meanwhile and moves it back when the output returns.
 "$helper" pin Brave missing "Gone"
-expect "apply-pins skips a pin whose sink is unavailable" "" "$(cat "$FIX/writes.log")"
+expect "apply-pins routes to an unplugged pinned output" "missing missing" "$(target_of 60) $(target_of 61)"
 
 setup
 "$helper" pin Brave speakers "Speakers"
@@ -183,11 +185,33 @@ wait
 expect "route waits for the lock" "yes" "$( (( waited >= 600 )) && echo yes || echo "no (${waited}ms)")"
 
 setup
-# Re-pinning to an output that is not there leaves the routes where they are,
-# and does not route the stream on screen to it either.
+# Re-pinning to an unplugged output moves the pin's routes there too, so they
+# follow the pin once it is plugged in.
 "$helper" pin Brave speakers "Speakers" >/dev/null
 "$helper" pin Brave missing "Gone" 60
-expect "re-pin to a missing output keeps the routes" "speakers speakers" "$(target_of 60) $(target_of 61)"
+expect "re-pin to an unplugged output moves the routes" "missing missing" "$(target_of 60) $(target_of 61)"
+
+setup
+# Choosing an output for a pinned stream does not depend on pactl's sink list.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+touch "$FIX/fail-sinks"
+"$helper" pin Brave headset "Headset" 60
+expect "pin with a stream works when pactl sinks fails" "headset" "$(target_of 60)"
+
+setup
+# The stream on screen is routed once, even when it is also one of the moved routes.
+"$helper" pin Brave speakers "Speakers" >/dev/null
+: >"$FIX/writes.log"
+"$helper" pin Brave headset "Headset" 60
+expect "pin writes the on-screen stream once" "2" "$(grep -c '^60 ' "$FIX/writes.log")"
+
+setup
+# Old sink-only markers look up app names with a single pactl call.
+mkdir -p "$XDG_STATE_HOME/omaudiopanel"
+printf 'Brave\tspeakers\tSpeakers\n' >"$XDG_STATE_HOME/omaudiopanel/pins"
+printf "update: id:60 key:'target.object' value:'speakers' type:'(null)'\nupdate: id:60 key:'omaudiopanel.pin' value:'speakers' type:'(null)'\nupdate: id:61 key:'target.object' value:'speakers' type:'(null)'\nupdate: id:61 key:'omaudiopanel.pin' value:'speakers' type:'(null)'\n" >"$FIX/metadata.txt"
+"$helper" unpin Brave
+expect "old markers need one pactl call" "1" "$(wc -l <"$FIX/sink-input-calls" | tr -d ' ')"
 
 setup
 # App names can contain an apostrophe; pw-metadata prints it unescaped.

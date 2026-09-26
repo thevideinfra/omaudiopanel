@@ -539,8 +539,22 @@ Panel {
   property var streamInfo: ({})     // stream node id -> { current, routed } sink names
   property int expandedStreamId: -1
 
+  // Route and pin commands run one at a time, in click order, through this
+  // queue: nothing is dropped, and pins and routes are re-read once each
+  // command has finished rather than after a guessed delay. The helper's lock
+  // still keeps the two panel instances (one per monitor) apart.
+  property var helperQueue: []
+
   function runHelper(args) {
-    Quickshell.execDetached([helperPath].concat(args))
+    helperQueue = helperQueue.concat([args])
+    runNextHelper()
+  }
+
+  function runNextHelper() {
+    if (helperQueueProc.running || helperQueue.length === 0) return
+    helperQueueProc.command = [helperPath].concat(helperQueue[0])
+    helperQueue = helperQueue.slice(1)
+    helperQueueProc.running = true
   }
 
   function refreshHelperState() {
@@ -596,11 +610,8 @@ Panel {
     pinsCommand(["unpin", app])
   }
 
-  // Detached like route/unroute: a second click while the first still waits
-  // on the helper's lock must not be dropped. The helper's lock orders them.
   function pinsCommand(args) {
     runHelper(args)
-    pinsRefreshTimer.restart()
   }
 
   // Tab titles for browser streams; see Model.streamTitles.
@@ -672,7 +683,6 @@ Panel {
     var old = next[stream.id] || { current: "", app: "", paused: false }
     next[stream.id] = { current: name || old.current, routed: name, app: old.app, paused: old.paused }
     streamInfo = next
-    streamsRefreshTimer.restart()
 
     // For a pinned app the pin follows the chosen output, and "pin" routes this
     // stream itself, so only one helper command runs; a separate "route" would
@@ -888,11 +898,20 @@ Panel {
     }
   }
 
-  // Re-read pins and routes after a pin change, once the helper has had time
-  // to finish; the periodic refresh covers slower runs.
+  Process {
+    id: helperQueueProc
+    onExited: {
+      if (root.helperQueue.length > 0) Qt.callLater(root.runNextHelper)
+      else helperSettledTimer.restart()
+    }
+  }
+
+  // Once the queue is empty, re-read what the helper changed. The short delay
+  // lets an earlier read that is still in flight finish first, so this read
+  // sees the final state.
   Timer {
-    id: pinsRefreshTimer
-    interval: 800
+    id: helperSettledTimer
+    interval: 150
     repeat: false
     onTriggered: root.refreshHelperState()
   }
@@ -903,7 +922,6 @@ Panel {
     repeat: false
     onTriggered: {
       root.runHelper(["apply-pins"])
-      streamsRefreshTimer.restart()
     }
   }
 

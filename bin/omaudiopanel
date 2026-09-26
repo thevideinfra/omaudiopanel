@@ -102,15 +102,28 @@ parse_markers() {
       }'
 }
 
+# Marker records for a dump. Old sink-only markers (empty app) need the app
+# list from pactl; it is fetched here, once, outside any subshell, so
+# marker_app can read it.
+stream_app_list=""
+load_markers() {
+  markers=$(parse_markers <<<"$1")
+  if grep -q $'^[0-9]*\x1f\x1f' <<<"$markers"; then
+    stream_app_list=$(stream_apps)
+  fi
+}
+
 # App of a marked stream: from the marker, or for an old sink-only marker,
-# from pactl (looked up once per run).
+# from the list load_markers fetched.
 marker_app() {
   local id=$1 app=$2
-  if [[ -z $app ]]; then
-    [[ -n ${stream_app_list+set} ]] || stream_app_list=$(stream_apps)
-    app=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$stream_app_list")
-  fi
+  [[ -n $app ]] || app=$(value_of "$id" "$stream_app_list")
   printf '%s' "$app"
+}
+
+# Value for key $1 in a key<TAB>value list ($2), e.g. a stream's route or app.
+value_of() {
+  awk -F'\t' -v id="$1" '$1 == id { print $2; exit }' <<<"$2"
 }
 
 stream_routes() {
@@ -132,15 +145,16 @@ stream_apps() {
         | "\(.properties["object.id"])\t\(.properties["application.name"])"'
 }
 
+# Route new streams of pinned apps. The pinned output does not need to be
+# plugged in: WirePlumber plays the stream on the default until it appears,
+# then moves it there.
 apply_pins() {
   [[ -s $pins_file ]] || return 0
-  local sinks routes id app pin
-  sinks=" $(timeout 2 pactl -f json list sinks 2>/dev/null | jq -r '.[].name' | tr '\n' ' ') "
+  local routes id app pin
   routes=$(stream_routes)
   while IFS=$'\t' read -r id app; do
     pin=$(awk -F'\t' -v a="$app" '$1 == a { print $2; exit }' "$pins_file")
-    [[ -n $pin && $sinks == *" $pin "* ]] || continue
-    awk -F'\t' -v id="$id" '$1 == id { found = 1 } END { exit !found }' <<<"$routes" && continue
+    [[ -n $pin && -z $(value_of "$id" "$routes") ]] || continue
     pin_route "$id" "$app" "$pin"
   done < <(stream_apps)
 }
@@ -252,7 +266,7 @@ case $cmd in
              (.properties["application.name"] // ""), (if .corked then "1" else "0" end)]
           | @tsv' \
       | while IFS=$'\t' read -r id current app paused; do
-          routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
+          routed=$(value_of "$id" "$routes")
           printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$current" "$routed" "$app" "$paused"
         done
     exit 0
@@ -272,20 +286,16 @@ case $cmd in
     [[ -f $pins_file ]] && awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
     printf '%s\t%s\t%s\n' "$app" "$sink" "${label:-$sink}" >>"$pins_file"
     # Re-pinning moves the pin's own routes (still on their marked output) to
-    # the new output; routes set by hand stay.
-    # Nothing moves to an output that is not there right now; apply_pins
-    # routes to it once it appears.
-    sinks=" $(timeout 2 pactl -f json list sinks 2>/dev/null | jq -r '.[].name' | tr '\n' ' ') "
-    if [[ $sinks == *" $sink "* ]]; then
-      dump=$(metadata_dump)
-      routes=$(parse_routes <<<"$dump")
-      while IFS=$'\x1f' read -r id marked_app marked_sink; do
-        [[ $marked_sink != "$sink" && $(marker_app "$id" "$marked_app") == "$app" ]] || continue
-        routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
-        [[ $routed == "$marked_sink" ]] && pin_route "$id" "$app" "$sink"
-      done < <(parse_markers <<<"$dump")
-      [[ -n $stream ]] && pin_route "$stream" "$app" "$sink"
-    fi
+    # the new output, plugged in or not; routes set by hand stay.
+    dump=$(metadata_dump)
+    routes=$(parse_routes <<<"$dump")
+    load_markers "$dump"
+    while IFS=$'\x1f' read -r id marked_app marked_sink; do
+      [[ -n $id && $id != "$stream" && $marked_sink != "$sink" ]] || continue
+      [[ $(marker_app "$id" "$marked_app") == "$app" ]] || continue
+      [[ $(value_of "$id" "$routes") == "$marked_sink" ]] && pin_route "$id" "$app" "$sink"
+    done <<<"$markers"
+    [[ -n $stream ]] && pin_route "$stream" "$app" "$sink"
     apply_pins
     ;;
 
@@ -298,16 +308,16 @@ case $cmd in
     [[ -f $pins_file ]] && awk -F'\t' -v a="$app" '$1 != a' "$pins_file" >"$pins_file.tmp" && mv "$pins_file.tmp" "$pins_file"
     dump=$(metadata_dump)
     routes=$(parse_routes <<<"$dump")
+    load_markers "$dump"
     while IFS=$'\x1f' read -r id marked_app marked_sink; do
-      [[ $(marker_app "$id" "$marked_app") == "$app" ]] || continue
-      routed=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<<"$routes")
-      if [[ $routed == "$marked_sink" ]]; then
+      [[ -n $id && $(marker_app "$id" "$marked_app") == "$app" ]] || continue
+      if [[ $(value_of "$id" "$routes") == "$marked_sink" ]]; then
         # Keep the marker if the reset fails, so a later unpin can retry.
         timeout 2 pw-metadata -d "$id" target.object >/dev/null || continue
         timeout 2 pw-metadata -d "$id" target.node >/dev/null
       fi
       timeout 2 pw-metadata -d "$id" "$pin_marker" >/dev/null
-    done < <(parse_markers <<<"$dump")
+    done <<<"$markers"
     ;;
 
   apply-pins)
