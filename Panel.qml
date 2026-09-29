@@ -1038,7 +1038,9 @@ Panel {
         anchors.fill: parent
         clip: true
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-        ScrollBar.vertical.policy: panelColumn.implicitHeight > height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+        // No visible scroll bar: it sat on top of the row controls. The panel
+        // still scrolls with the wheel or touchpad when it overflows.
+        ScrollBar.vertical.policy: ScrollBar.AlwaysOff
         Binding {
           target: scrollArea.contentItem
           property: "interactive"
