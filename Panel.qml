@@ -1182,8 +1182,9 @@ Panel {
                 width: parent.width
                 implicitHeight: Math.max(outputHeader.implicitHeight, outputPercent.implicitHeight)
 
-                PanelSectionHeader {
+                SectionLabel {
                   id: outputHeader
+                  icon: "\uf028"
                   text: "OUTPUT"
                   foreground: root.bar.foreground
                   fontFamily: root.bar.fontFamily
@@ -1294,8 +1295,9 @@ Panel {
                 width: parent.width
                 implicitHeight: Math.max(microphoneHeader.implicitHeight, microphonePercent.implicitHeight)
 
-                PanelSectionHeader {
+                SectionLabel {
                   id: microphoneHeader
+                  icon: "\uf130"
                   text: "INPUT"
                   foreground: root.bar.foreground
                   fontFamily: root.bar.fontFamily
@@ -1416,7 +1418,8 @@ Panel {
               spacing: root.sp(10)
               visible: root.displayAudioStreams.length > 0
 
-              PanelSectionHeader {
+              SectionLabel {
+                icon: "\uf001"
                 text: "SOURCES"
                 foreground: root.bar.foreground
                 fontFamily: root.bar.fontFamily
@@ -1446,7 +1449,8 @@ Panel {
               spacing: root.sp(6)
               visible: root.showDisabled && root.disabledDevices.length > 0
 
-              PanelSectionHeader {
+              SectionLabel {
+                icon: "\uf011"
                 text: "DISABLED"
                 foreground: root.bar.foreground
                 fontFamily: root.bar.fontFamily
@@ -1492,28 +1496,40 @@ Panel {
               foreground: root.bar.foreground
             }
 
-            Item {
+            // Same boxes as the settings view; the hint says what the step drives.
+            Column {
               visible: root.showStepFooter
               width: parent.width
-              implicitHeight: Math.max(scrollStepLabel.implicitHeight, scrollStepChips.implicitHeight)
+              spacing: root.sp(9)
 
-              Text {
-                id: scrollStepLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                textFormat: Text.PlainText
-                text: "Volume step (scroll, keys)"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: root.fontCaption
-                elide: Text.ElideRight
-                width: parent.width - scrollStepChips.width - root.sp(8)
+              Item {
+                width: parent.width
+                implicitHeight: footerStepLabel.implicitHeight
+
+                SectionLabel {
+                  id: footerStepLabel
+                  icon: "\uf1de"
+                  text: "VOLUME STEP"
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.PlainText
+                  text: "scroll · keys"
+                  color: root.bar.foreground
+                  opacity: 0.4
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: root.fontCaption
+                  font.letterSpacing: 0.8
+                }
               }
 
-              ChoiceChips {
-                id: scrollStepChips
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
+              Segmented {
+                width: parent.width
+                columns: 4
                 choices: root.scrollStepChoices.map(function(v) { return { value: v, label: v + "%" } })
                 selected: root.scrollStep
                 onPicked: function(value) { root.setScrollStep(value) }
@@ -2326,13 +2342,16 @@ Panel {
       }
     }
 
-    PanelSectionHeader {
+    SectionLabel {
+      icon: "\uf1fc"
       text: "DENSITY"
       foreground: root.bar.foreground
       fontFamily: root.bar.fontFamily
     }
 
-    ChoiceChips {
+    Segmented {
+      width: parent.width
+      columns: 3
       choices: [
         { value: "compact", label: "Compact" },
         { value: "normal", label: "Normal" },
@@ -2342,13 +2361,16 @@ Panel {
       onPicked: function(value) { root.setSetting("density", value) }
     }
 
-    PanelSectionHeader {
+    SectionLabel {
+      icon: "\uf031"
       text: "FONT SIZE"
       foreground: root.bar.foreground
       fontFamily: root.bar.fontFamily
     }
 
-    ChoiceChips {
+    Segmented {
+      width: parent.width
+      columns: 3
       choices: [
         { value: "small", label: "Small" },
         { value: "normal", label: "Normal" },
@@ -2362,7 +2384,8 @@ Panel {
       foreground: root.bar.foreground
     }
 
-    PanelSectionHeader {
+    SectionLabel {
+      icon: "\uf06e"
       text: "SHOW"
       foreground: root.bar.foreground
       fontFamily: root.bar.fontFamily
@@ -2413,13 +2436,16 @@ Panel {
       foreground: root.bar.foreground
     }
 
-    PanelSectionHeader {
+    SectionLabel {
+      icon: "\uf1de"
       text: "VOLUME STEP"
       foreground: root.bar.foreground
       fontFamily: root.bar.fontFamily
     }
 
-    ChoiceChips {
+    Segmented {
+      width: parent.width
+      columns: 4
       choices: root.scrollStepChoices.map(function(v) { return { value: v, label: v + "%" } })
       selected: root.scrollStep
       onPicked: function(value) { root.setScrollStep(value) }
@@ -2470,6 +2496,89 @@ Panel {
       cursorShape: Qt.PointingHandCursor
       onContainsMouseChanged: sw.hovered(containsMouse)
       onClicked: sw.toggled()
+    }
+  }
+
+  // Section title in the tandem style: a dim icon, then the bold title.
+  // foreground/fontFamily match the stock header's properties so call sites
+  // keep their bindings.
+  component SectionLabel: Row {
+    id: section
+    property string icon: ""
+    property string text: ""
+    property color foreground: root.bar.foreground
+    property string fontFamily: root.bar.fontFamily
+
+    spacing: root.sp(7)
+
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: section.icon
+      color: section.foreground
+      opacity: 0.65
+      font.family: section.fontFamily
+      font.pixelSize: Math.round(root.fontCaption * 1.2)
+    }
+
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: section.text
+      color: Qt.darker(section.foreground, 1.4)
+      font.family: section.fontFamily
+      font.pixelSize: root.fontCaption
+      font.bold: true
+      font.letterSpacing: 1.2
+    }
+  }
+
+  // Equal-width choice boxes in a grid (tandem's style); the chosen one is
+  // tinted and outlined in the accent.
+  component Segmented: Grid {
+    id: segmented
+    property var choices: []
+    property var selected
+    signal picked(var value)
+
+    spacing: root.sp(6)
+    readonly property real cellWidth: (width - (columns - 1) * spacing) / columns
+
+    Repeater {
+      model: segmented.choices
+
+      Rectangle {
+        id: choice
+        required property var modelData
+        readonly property bool chosen: segmented.selected === modelData.value
+        width: segmented.cellWidth
+        implicitHeight: choiceText.implicitHeight + root.sp(12)
+        radius: root.sp(7)
+        color: chosen
+          ? Util.alpha(Color.accent, 0.12)
+          : Util.alpha(root.bar.foreground, choiceMouse.containsMouse ? 0.09 : 0.05)
+        border.width: chosen ? 2 : 1
+        border.color: chosen ? Color.accent : Util.alpha(root.bar.foreground, 0.12)
+
+        Text {
+          id: choiceText
+          anchors.centerIn: parent
+          textFormat: Text.PlainText
+          text: choice.modelData.label
+          color: choice.chosen ? Color.accent : root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: root.fontCaption
+          font.bold: choice.chosen
+        }
+
+        MouseArea {
+          id: choiceMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: segmented.picked(choice.modelData.value)
+        }
+      }
     }
   }
 }
