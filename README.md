@@ -3,7 +3,7 @@
 Omarchy's audio panel, with the controls it was missing. Drop-in replacement. Follows Omarchy themes.
 
 <p>
-  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: playing bars and a mute switch on OUTPUT and INPUT, a Bluetooth speaker marked as such, Brave in the mixer with its output field and mute switch, the folded Disabled section and the volume step" width="360">
+  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: playing bars and a mute switch on OUTPUT and INPUT, a Bluetooth speaker marked as such, Brave in the mixer with its output field and mute switch, the folded Disabled section and the volume step choices" width="360">
   <img src="assets/omaudioroute.png" alt="The same panel with Brave's output picker open, the option to always play it on one output, and the power icon for disabling an output" width="360">
 </p>
 
@@ -34,8 +34,8 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   beside each app that is making sound, in your theme's accent colour — as do
   the volume sliders, level meters and the device in use.
 - **Pick the volume step.** 1%, 2%, 5% or 10% per scroll notch on the bar
-  icon, per slider step and per `h`/`l` in the panel, set from the panel's
-  footer.
+  icon, per slider step and per `h`/`l` in the panel, chosen at the bottom of
+  the panel.
 - **Make it yours.** The ⚙ in the panel header opens its settings: a
   **Compact**, **Normal** or **Comfortable** layout, a **Small**, **Normal**
   or **Large** font size, and switches to hide the
