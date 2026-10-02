@@ -400,6 +400,16 @@ function accentColor(choice, palette) {
   return null
 }
 
+// The "version" field of a manifest.json text; empty if it cannot be read.
+function manifestVersion(text) {
+  try {
+    var v = JSON.parse(String(text)).version
+    return v ? String(v) : ""
+  } catch (e) {
+    return ""
+  }
+}
+
 // Size multiplier for the panel's own spacing, fonts and width, relative
 // to the stock panel. All three are smaller than stock; normal is the default.
 function densityScale(name) {
@@ -473,6 +483,7 @@ if (typeof module !== "undefined") {
     pinTarget: pinTarget,
     scrollTargetFor: scrollTargetFor,
     eqBarLevels: eqBarLevels,
+    manifestVersion: manifestVersion,
     parsePalette: parsePalette,
     accentChoices: accentChoices,
     accentColor: accentColor,

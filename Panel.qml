@@ -126,6 +126,16 @@ Panel {
   readonly property real densityScale: Model.densityScale(density)
   readonly property string fontSize: String(setting("fontSize", "normal"))
   readonly property string accentChoice: String(setting("accent", "theme"))
+  readonly property string repoUrl: "https://github.com/thevideinfra/omaudiopanel"
+  property string version: ""
+
+  // The version shown in the header comes from this plugin's manifest, so it
+  // cannot drift from the release.
+  FileView {
+    path: Qt.resolvedUrl("manifest.json")
+    printErrors: false
+    onLoaded: root.version = Model.manifestVersion(text())
+  }
 
   AccentSource {
     id: accentSource
@@ -998,7 +1008,12 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(root.sp(380))
+    // Less padding than the shell's popups (8, from the default 14), to save
+    // space; the width gives up the same amount so the content area keeps its
+    // size.
+    padding: Style.space(8)
+    readonly property int savedPadding: Math.max(0, Style.spacing.popupPadding - panel.padding)
+    contentWidth: panel.fittedContentWidth(root.sp(380) - 2 * savedPadding)
     contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, root.sp(760))
 
     PanelKeyCatcher {
@@ -1144,14 +1159,68 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               spacing: root.sp(2)
 
-              Text {
-                text: "omaudio"
-                color: root.bar.foreground
-                font.family: root.bar.fontFamily
-                font.pixelSize: root.fontTitle
-                font.bold: true
-                elide: Text.ElideRight
+              // The name, then the version and a link to the repository.
+              Row {
+                spacing: root.sp(8)
                 width: parent.width
+
+                Text {
+                  id: titleText
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "omaudio"
+                  color: root.bar.foreground
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: root.fontTitle
+                  font.bold: true
+                }
+
+                Rectangle {
+                  visible: root.version !== ""
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: versionText.implicitWidth + root.sp(10)
+                  height: versionText.implicitHeight + root.sp(4)
+                  radius: height / 2
+                  color: Util.alpha(root.accent, 0.15)
+                  border.width: 1
+                  border.color: Util.alpha(root.accent, 0.45)
+
+                  Text {
+                    id: versionText
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: "v" + root.version
+                    color: root.accent
+                    font.family: root.bar.fontFamily
+                    font.pixelSize: root.fontCaption
+                    font.bold: true
+                  }
+                }
+
+                // Opens the repository in the browser.
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.PlainText
+                  text: "\uf09b"
+                  color: repoMouse.containsMouse ? root.accent : root.bar.foreground
+                  opacity: repoMouse.containsMouse ? 1.0 : 0.6
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: root.fontBody
+
+                  MouseArea {
+                    id: repoMouse
+                    anchors.fill: parent
+                    anchors.margins: -root.sp(4)
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: if (root.bar) root.bar.run("xdg-open " + root.bar.shellQuote(root.repoUrl))
+                  }
+
+                  PanelToolTip {
+                    visible: repoMouse.containsMouse
+                    text: "Open on GitHub"
+                    fontFamily: root.bar.fontFamily
+                  }
+                }
               }
             }
           }

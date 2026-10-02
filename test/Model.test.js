@@ -172,3 +172,10 @@ test("accentColor returns the palette colour or null for theme and unknown names
   assert.equal(M.accentColor("orange", palette), null)
   assert.equal(M.accentColor(undefined, palette), null)
 })
+
+test("manifestVersion reads the version from manifest JSON, empty when unreadable", () => {
+  assert.equal(M.manifestVersion('{ "id": "x", "version": "0.3.1" }'), "0.3.1")
+  assert.equal(M.manifestVersion('{ "id": "x" }'), "")
+  assert.equal(M.manifestVersion("not json"), "")
+  assert.equal(M.manifestVersion(undefined), "")
+})
