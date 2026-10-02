@@ -40,7 +40,8 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   **Compact**, **Normal** or **Comfortable** layout, a **Small**, **Normal**
   or **Large** font size, an accent colour (the theme's own, or any colour from
   its palette), and switches to hide the
-  playing bars, the output and input mute switches, the output field under each app, the Disabled section or the
+  playing bars, the output and input mute switches, the output field under each app,
+  the version and GitHub link, the Disabled section or the
   volume step footer.
 
   <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, switches for each part of the panel and the volume step" width="300">
@@ -113,6 +114,7 @@ click. From a terminal:
 | `showSectionMutes`| `true`     | Mute switches beside OUTPUT and INPUT                    |
 | `showRouting`     | `true`     | The "Playing on …" output field under each app           |
 | `showDisabled`    | `true`     | The Disabled devices section                             |
+| `showHeaderInfo`  | `true`     | The version and GitHub link in the header                |
 | `showStepFooter`  | `true`     | The volume step footer                                   |
 
 ```bash

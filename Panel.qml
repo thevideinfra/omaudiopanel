@@ -157,6 +157,7 @@ Panel {
   readonly property bool showDisabled: Model.settingBool(setting("showDisabled", true), true)
   readonly property bool showSectionMutes: Model.settingBool(setting("showSectionMutes", true), true)
   readonly property bool showStepFooter: Model.settingBool(setting("showStepFooter", true), true)
+  readonly property bool showHeaderInfo: Model.settingBool(setting("showHeaderInfo", true), true)
   property bool settingsOpen: false
 
   // Style.space scaled by the chosen density.
@@ -1175,7 +1176,7 @@ Panel {
                 }
 
                 Rectangle {
-                  visible: root.version !== ""
+                  visible: root.showHeaderInfo && root.version !== ""
                   anchors.verticalCenter: parent.verticalCenter
                   width: versionText.implicitWidth + root.sp(10)
                   height: versionText.implicitHeight + root.sp(4)
@@ -1198,6 +1199,7 @@ Panel {
 
                 // Opens the repository in the browser.
                 Text {
+                  visible: root.showHeaderInfo
                   anchors.verticalCenter: parent.verticalCenter
                   textFormat: Text.PlainText
                   text: "\uf09b"
@@ -2494,6 +2496,13 @@ Panel {
         label: "Disabled devices section"
         checked: root.showDisabled
         onToggled: root.setSetting("showDisabled", !root.showDisabled)
+      }
+
+      SettingSwitch {
+        width: parent.width
+        label: "Version & GitHub link"
+        checked: root.showHeaderInfo
+        onToggled: root.setSetting("showHeaderInfo", !root.showHeaderInfo)
       }
 
       SettingSwitch {

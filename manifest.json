@@ -27,7 +27,8 @@
       "showStepFooter": true,
       "fontSize": "normal",
       "showSectionMutes": true,
-      "accent": "theme"
+      "accent": "theme",
+      "showHeaderInfo": true
     },
     "schema": [
       {
@@ -103,6 +104,12 @@
         "key": "showDisabled",
         "type": "boolean",
         "label": "Show the Disabled devices section",
+        "defaultValue": true
+      },
+      {
+        "key": "showHeaderInfo",
+        "type": "boolean",
+        "label": "Show the version and GitHub link in the header",
         "defaultValue": true
       },
       {
