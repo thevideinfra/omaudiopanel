@@ -3,7 +3,7 @@
 Omarchy's audio panel, with the controls it was missing. Drop-in replacement. Follows Omarchy themes.
 
 <p>
-  <img src="assets/omaudiopanel.png" alt="The omaudiopanel audio panel: playing bars and a mute switch on OUTPUT and INPUT, a Bluetooth speaker marked as such, Brave in the mixer with its output field and mute switch, the folded Disabled section and the volume step choices" width="360">
+  <img src="assets/omaudiopanel.png" alt="The omaudio panel with its version and GitHub link in the header: playing bars and a mute switch on OUTPUT and INPUT, a Bluetooth speaker marked as such, Brave in the mixer with its output field and mute switch, the folded Disabled section and the volume step choices" width="360">
   <img src="assets/omaudioroute.png" alt="The same panel with Brave's output picker open, the option to always play it on one output, and the power icon for disabling an output" width="360">
 </p>
 
@@ -44,7 +44,7 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   the version and GitHub link, the Disabled section or the
   volume step footer.
 
-  <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, switches for each part of the panel and the volume step" width="300">
+  <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, accent colour swatches from the theme's palette, switches for each part of the panel and the volume step" width="300">
 
 Changing the default output also leaves apps you routed or pinned where they
 are, instead of moving every stream to the new default.
