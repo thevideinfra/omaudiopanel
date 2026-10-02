@@ -26,7 +26,8 @@
       "showDisabled": true,
       "showStepFooter": true,
       "fontSize": "normal",
-      "showSectionMutes": true
+      "showSectionMutes": true,
+      "accent": "theme"
     },
     "schema": [
       {
@@ -52,6 +53,23 @@
         ],
         "defaultValue": "normal",
         "description": "Text size, on top of the density's own scaling."
+      },
+      {
+        "key": "accent",
+        "type": "enum",
+        "label": "Accent colour",
+        "options": [
+          "theme",
+          "blue",
+          "cyan",
+          "green",
+          "magenta",
+          "yellow",
+          "red",
+          "orange"
+        ],
+        "defaultValue": "theme",
+        "description": "The colour the panel highlights with: the theme's accent, or a colour from its palette."
       },
       {
         "key": "scrollStep",

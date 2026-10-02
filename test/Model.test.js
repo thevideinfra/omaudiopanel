@@ -151,3 +151,24 @@ test("isBluetooth recognises bluez nodes by name or device.api", () => {
   assert.equal(M.isBluetooth({ name: "alsa_output.usb-ACTIONS_Pebble_V3-00.analog-stereo" }), false)
   assert.equal(M.isBluetooth(null), false)
 })
+
+test("parsePalette reads quoted hex colours from a colors.toml", () => {
+  const toml = 'accent = "#59C98D"\nred = "#E0607F"\n# comment\nbackground = "#101315"\nbad = "not-a-colour"\nshort = "#abc"\n'
+  assert.deepEqual(M.parsePalette(toml), { accent: "#59C98D", red: "#E0607F", background: "#101315" })
+  assert.deepEqual(M.parsePalette(""), {})
+  assert.deepEqual(M.parsePalette(undefined), {})
+})
+
+test("accentChoices lists theme first, then palette colours in a fixed order", () => {
+  const palette = { green: "#4FA86F", blue: "#6E7FB8", accent: "#59C98D", red: "#E0607F" }
+  assert.deepEqual(M.accentChoices(palette), ["theme", "blue", "green", "red"])
+  assert.deepEqual(M.accentChoices({}), ["theme"])
+})
+
+test("accentColor returns the palette colour or null for theme and unknown names", () => {
+  const palette = { blue: "#6E7FB8" }
+  assert.equal(M.accentColor("blue", palette), "#6E7FB8")
+  assert.equal(M.accentColor("theme", palette), null)
+  assert.equal(M.accentColor("orange", palette), null)
+  assert.equal(M.accentColor(undefined, palette), null)
+})

@@ -125,6 +125,16 @@ Panel {
   readonly property string density: String(setting("density", "normal"))
   readonly property real densityScale: Model.densityScale(density)
   readonly property string fontSize: String(setting("fontSize", "normal"))
+  readonly property string accentChoice: String(setting("accent", "theme"))
+
+  AccentSource {
+    id: accentSource
+    choice: root.accentChoice
+  }
+
+  // The colour the panel highlights with (sliders, switches, bars, stripes and
+  // chosen options): the theme's accent unless one is picked in settings.
+  readonly property color accent: accentSource.value
   // Text shrinks half as fast as spacing so compact stays readable, then the
   // font size setting scales it on top.
   readonly property real fontScale: (0.5 + 0.5 * densityScale) * Model.fontSizeScale(fontSize)
@@ -1101,7 +1111,7 @@ Panel {
               text: root.settingsOpen ? "󰅖" : "󰒓"
               // Larger than the header text and accent on hover, so it reads
               // as a control rather than decoration.
-              color: gearMouse.containsMouse || root.settingsOpen ? Color.accent : root.bar.foreground
+              color: gearMouse.containsMouse || root.settingsOpen ? root.accent : root.bar.foreground
               font.family: root.bar.fontFamily
               font.pixelSize: Math.round(root.fontTitle * 1.45)
               opacity: gearMouse.containsMouse || root.settingsOpen ? 1.0 : 0.85
@@ -1135,27 +1145,11 @@ Panel {
               spacing: root.sp(2)
 
               Text {
-                text: "Audio"
+                text: "omaudio"
                 color: root.bar.foreground
                 font.family: root.bar.fontFamily
                 font.pixelSize: root.fontTitle
                 font.bold: true
-                elide: Text.ElideRight
-                width: parent.width
-              }
-
-              Text {
-                id: heroLabel
-                textFormat: Text.PlainText
-                text: root.outputVolumeName(
-                  outputSlider.dragging ? outputSlider.liveValue : root.outputVolume,
-                  root.outputMuted
-                ).toUpperCase()
-                color: Qt.darker(root.bar.foreground, 1.4)
-                font.family: root.bar.fontFamily
-                font.pixelSize: root.fontCaption
-                font.bold: true
-                font.letterSpacing: 1.2
                 elide: Text.ElideRight
                 width: parent.width
               }
@@ -1242,8 +1236,8 @@ Panel {
                 PanelSlider {
                   id: outputSlider
                   bar: root.bar
-                  fillColor: Color.accent
-                  knobColor: Color.accent
+                  fillColor: root.accent
+                  knobColor: root.accent
                   anchors.fill: parent
                   anchors.leftMargin: root.sp(6)
                   anchors.rightMargin: root.sp(6)
@@ -1356,8 +1350,8 @@ Panel {
                   PanelSlider {
                     id: inputSlider
                     bar: root.bar
-                    fillColor: Color.accent
-                    knobColor: Color.accent
+                    fillColor: root.accent
+                    knobColor: root.accent
                     width: parent.width
                     minimum: 0
                     maximum: 1
@@ -1379,7 +1373,7 @@ Panel {
                     Rectangle {
                       height: parent.height
                       width: parent.width * Math.max(0, Math.min(1, inputPeakMonitor.peak))
-                      color: Color.accent
+                      color: root.accent
                       Behavior on width { NumberAnimation { duration: 70 } }
                     }
                   }
@@ -1567,7 +1561,7 @@ Panel {
       width: Math.max(2, root.sp(3))
       height: parent.height * 0.55
       radius: width / 2
-      color: Color.accent
+      color: root.accent
     }
     hasCursor: root.cursorActive && root.focusSection === "output" && root.selectedIndex === rowIndex
     onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(sinkRow)
@@ -1614,7 +1608,7 @@ Panel {
         visible: Model.isBluetooth(sinkRow.node)
         textFormat: Text.PlainText
         text: "󰂯"
-        color: Color.accent
+        color: root.accent
         font.family: root.bar.fontFamily
         font.pixelSize: root.fontBody
         anchors.verticalCenter: parent.verticalCenter
@@ -1660,7 +1654,7 @@ Panel {
       width: Math.max(2, root.sp(3))
       height: parent.height * 0.55
       radius: width / 2
-      color: Color.accent
+      color: root.accent
     }
     hasCursor: root.cursorActive && root.focusSection === "input" && root.selectedIndex === rowIndex
     onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(sourceRow)
@@ -1707,7 +1701,7 @@ Panel {
         visible: Model.isBluetooth(sourceRow.node)
         textFormat: Text.PlainText
         text: "󰂯"
-        color: Color.accent
+        color: root.accent
         font.family: root.bar.fontFamily
         font.pixelSize: root.fontBody
         anchors.verticalCenter: parent.verticalCenter
@@ -1852,8 +1846,8 @@ Panel {
         maximum: 1.5
         step: root.scrollStep / 100
         value: streamRow.streamVolume
-        fillColor: Color.accent
-        knobColor: Color.accent
+        fillColor: root.accent
+        knobColor: root.accent
         opacity: streamRow.streamMuted ? 0.5 : 1.0
 
         onMoved: function(v) {
@@ -1927,7 +1921,7 @@ Panel {
                   + (modelData.sink
                     ? root.nodeLabel(modelData.sink)
                     : "Default output (" + root.nodeLabel(root.sink) + ")")
-                color: chosen ? Color.accent : (choiceMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
+                color: chosen ? root.accent : (choiceMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
                 font.family: root.bar.fontFamily
                 font.pixelSize: root.fontCaption
                 font.bold: chosen
@@ -1956,7 +1950,7 @@ Panel {
               textFormat: Text.PlainText
               text: (checked ? "󰄲  " : "󰄱  ") + "Always play " + (root.streamApp(streamRow.node) || root.streamLabel(streamRow.node))
                 + " on " + root.sinkLabelFor(targetName)
-              color: checked ? Color.accent : (pinMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
+              color: checked ? root.accent : (pinMouse.containsMouse ? root.bar.foreground : Qt.darker(root.bar.foreground, 1.25))
               font.family: root.bar.fontFamily
               font.pixelSize: root.fontCaption
               font.bold: checked
@@ -2080,7 +2074,7 @@ Panel {
         visible: Model.isBluetooth({ name: disabledRow.entry.name })
         textFormat: Text.PlainText
         text: "󰂯"
-        color: Color.accent
+        color: root.accent
         font.family: root.bar.fontFamily
         font.pixelSize: root.fontBody
         anchors.verticalCenter: parent.verticalCenter
@@ -2233,7 +2227,7 @@ Panel {
         width: Math.max(2, root.sp(3))
         height: Math.max(2, eq.barHeight * eq.levels[index])
         radius: width / 2
-        color: Color.accent
+        color: root.accent
         Behavior on height { NumberAnimation { duration: 90 } }
       }
     }
@@ -2257,7 +2251,7 @@ Panel {
         readonly property bool chosen: chips.selected === modelData.value
         textFormat: Text.PlainText
         text: modelData.label
-        color: chosen ? Color.accent : root.bar.foreground
+        color: chosen ? root.accent : root.bar.foreground
         font.family: root.bar.fontFamily
         font.pixelSize: root.fontCaption
         font.bold: chosen
@@ -2380,6 +2374,15 @@ Panel {
       onPicked: function(value) { root.setSetting("fontSize", value) }
     }
 
+    SectionLabel {
+      icon: "\uf1fb"
+      text: "ACCENT"
+      foreground: root.bar.foreground
+      fontFamily: root.bar.fontFamily
+    }
+
+    AccentPicker { width: parent.width }
+
     PanelSeparator {
       foreground: root.bar.foreground
     }
@@ -2470,10 +2473,10 @@ Panel {
       anchors.fill: parent
       radius: height / 2
       color: sw.checked
-        ? Util.alpha(Color.accent, sw.focused ? 0.55 : 0.3)
+        ? Util.alpha(root.accent, sw.focused ? 0.55 : 0.3)
         : Util.alpha(root.bar.foreground, sw.focused ? 0.25 : 0.1)
       border.width: 1
-      border.color: sw.checked ? Color.accent : Util.alpha(root.bar.foreground, sw.focused ? 0.6 : 0.25)
+      border.color: sw.checked ? root.accent : Util.alpha(root.bar.foreground, sw.focused ? 0.6 : 0.25)
       Behavior on color { ColorAnimation { duration: 120 } }
 
       Rectangle {
@@ -2482,7 +2485,7 @@ Panel {
         radius: width / 2
         anchors.verticalCenter: parent.verticalCenter
         x: sw.checked ? parent.width - width - (parent.height - height) / 2 : (parent.height - height) / 2
-        color: sw.checked ? Color.accent : Qt.darker(root.bar.foreground, 1.4)
+        color: sw.checked ? root.accent : Qt.darker(root.bar.foreground, 1.4)
         Behavior on x { NumberAnimation { duration: 120 } }
         Behavior on color { ColorAnimation { duration: 120 } }
       }
@@ -2555,17 +2558,17 @@ Panel {
         implicitHeight: choiceText.implicitHeight + root.sp(12)
         radius: root.sp(7)
         color: chosen
-          ? Util.alpha(Color.accent, 0.12)
+          ? Util.alpha(root.accent, 0.12)
           : Util.alpha(root.bar.foreground, choiceMouse.containsMouse ? 0.09 : 0.05)
         border.width: chosen ? 2 : 1
-        border.color: chosen ? Color.accent : Util.alpha(root.bar.foreground, 0.12)
+        border.color: chosen ? root.accent : Util.alpha(root.bar.foreground, 0.12)
 
         Text {
           id: choiceText
           anchors.centerIn: parent
           textFormat: Text.PlainText
           text: choice.modelData.label
-          color: choice.chosen ? Color.accent : root.bar.foreground
+          color: choice.chosen ? root.accent : root.bar.foreground
           font.family: root.bar.fontFamily
           font.pixelSize: root.fontCaption
           font.bold: choice.chosen
@@ -2577,6 +2580,70 @@ Panel {
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
           onClicked: segmented.picked(choice.modelData.value)
+        }
+      }
+    }
+  }
+
+  // The theme's own accent, then the other colours of its palette, each drawn
+  // in its real colour. The chosen one is ringed.
+  component AccentPicker: Flow {
+    id: picker
+    spacing: root.sp(5)
+
+    Repeater {
+      model: accentSource.available
+
+      Rectangle {
+        id: swatch
+        required property string modelData
+        readonly property bool chosen: root.accentChoice === modelData
+        readonly property bool isTheme: modelData === "theme"
+        width: isTheme ? themeLabel.implicitWidth + root.sp(30) : root.sp(23)
+        height: root.sp(23)
+        radius: height / 2
+        color: isTheme ? Util.alpha(root.bar.foreground, 0.06) : accentSource.colorOf(modelData)
+        border.width: chosen ? 2 : 1
+        border.color: chosen ? root.bar.foreground : Util.alpha(root.bar.foreground, isTheme ? 0.25 : 0.15)
+
+        // The theme entry is a pill with a dot in the theme's own accent.
+        Rectangle {
+          visible: swatch.isTheme
+          anchors.left: parent.left
+          anchors.leftMargin: root.sp(7)
+          anchors.verticalCenter: parent.verticalCenter
+          width: root.sp(11)
+          height: width
+          radius: width / 2
+          color: Color.accent
+        }
+
+        Text {
+          id: themeLabel
+          visible: swatch.isTheme
+          anchors.right: parent.right
+          anchors.rightMargin: root.sp(8)
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: "Theme"
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: root.fontCaption
+          font.bold: swatch.chosen
+        }
+
+        MouseArea {
+          id: swatchMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.setSetting("accent", swatch.modelData)
+        }
+
+        PanelToolTip {
+          visible: swatchMouse.containsMouse
+          text: swatch.isTheme ? "Theme accent" : swatch.modelData.charAt(0).toUpperCase() + swatch.modelData.slice(1)
+          fontFamily: root.bar.fontFamily
         }
       }
     }

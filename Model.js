@@ -370,6 +370,36 @@ function eqBarLevels(peak, phase) {
   return bars
 }
 
+// Accent colours the picker can offer, in this order, when the theme defines
+// them.
+var ACCENT_NAMES = ["blue", "cyan", "green", "magenta", "yellow", "red", "orange"]
+
+// name -> "#rrggbb" for every quoted hex colour in a theme's colors.toml.
+function parsePalette(text) {
+  var palette = {}
+  var lines = String(text || "").split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var m = lines[i].match(/^\s*([a-z_]+)\s*=\s*"(#[0-9a-fA-F]{6})"/)
+    if (m) palette[m[1]] = m[2]
+  }
+  return palette
+}
+
+// "theme" followed by whichever accent colours the palette has.
+function accentChoices(palette) {
+  var list = ["theme"]
+  for (var i = 0; i < ACCENT_NAMES.length; i++)
+    if (palette && palette[ACCENT_NAMES[i]] !== undefined) list.push(ACCENT_NAMES[i])
+  return list
+}
+
+// The palette colour for a choice, or null when the theme's own accent applies
+// ("theme", or a colour this theme does not define).
+function accentColor(choice, palette) {
+  if (choice && choice !== "theme" && palette && palette[choice] !== undefined) return palette[choice]
+  return null
+}
+
 // Size multiplier for the panel's own spacing, fonts and width, relative
 // to the stock panel. All three are smaller than stock; normal is the default.
 function densityScale(name) {
@@ -443,6 +473,9 @@ if (typeof module !== "undefined") {
     pinTarget: pinTarget,
     scrollTargetFor: scrollTargetFor,
     eqBarLevels: eqBarLevels,
+    parsePalette: parsePalette,
+    accentChoices: accentChoices,
+    accentColor: accentColor,
     densityScale: densityScale,
     settingBool: settingBool,
     fontSizeScale: fontSizeScale,

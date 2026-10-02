@@ -38,7 +38,8 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   the panel.
 - **Make it yours.** The ⚙ in the panel header opens its settings: a
   **Compact**, **Normal** or **Comfortable** layout, a **Small**, **Normal**
-  or **Large** font size, and switches to hide the
+  or **Large** font size, an accent colour (the theme's own, or any colour from
+  its palette), and switches to hide the
   playing bars, the output and input mute switches, the output field under each app, the Disabled section or the
   volume step footer.
 
@@ -105,6 +106,7 @@ click. From a terminal:
 | Key               | Default    | Meaning                                                  |
 |-------------------|------------|----------------------------------------------------------|
 | `density`         | `"normal"` | `"compact"`, `"normal"` or `"comfortable"`              |
+| `accent`          | `"theme"`  | `"theme"` or `"blue"`, `"cyan"`, `"green"`, `"magenta"`, `"yellow"`, `"red"`, `"orange"` (from the theme's palette) |
 | `fontSize`        | `"normal"` | `"small"`, `"normal"` or `"large"`, on top of density    |
 | `scrollStep`      | `5`        | Volume step in percent (1–25)                            |
 | `showPlayingBars` | `true`     | Equalizer bars next to OUTPUT and each playing app       |
