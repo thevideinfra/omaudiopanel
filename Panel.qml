@@ -1160,67 +1160,80 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               spacing: root.sp(2)
 
-              // The name, then the version and a link to the repository.
-              Row {
-                spacing: root.sp(8)
+              // The name on the left; the version and a link to the repository on
+              // the right of the same line, next to the gear.
+              Item {
                 width: parent.width
+                implicitHeight: Math.max(titleText.implicitHeight, infoRow.implicitHeight)
 
                 Text {
                   id: titleText
+                  anchors.left: parent.left
+                  anchors.right: infoRow.visible ? infoRow.left : parent.right
+                  anchors.rightMargin: root.sp(8)
                   anchors.verticalCenter: parent.verticalCenter
                   text: "omaudio"
                   color: root.bar.foreground
                   font.family: root.bar.fontFamily
                   font.pixelSize: root.fontTitle
                   font.bold: true
+                  elide: Text.ElideRight
                 }
 
-                Rectangle {
-                  visible: root.showHeaderInfo && root.version !== ""
-                  anchors.verticalCenter: parent.verticalCenter
-                  width: versionText.implicitWidth + root.sp(10)
-                  height: versionText.implicitHeight + root.sp(4)
-                  radius: height / 2
-                  color: Util.alpha(root.accent, 0.15)
-                  border.width: 1
-                  border.color: Util.alpha(root.accent, 0.45)
-
-                  Text {
-                    id: versionText
-                    anchors.centerIn: parent
-                    textFormat: Text.PlainText
-                    text: "v" + root.version
-                    color: root.accent
-                    font.family: root.bar.fontFamily
-                    font.pixelSize: root.fontCaption
-                    font.bold: true
-                  }
-                }
-
-                // Opens the repository in the browser.
-                Text {
+                Row {
+                  id: infoRow
                   visible: root.showHeaderInfo
+                  anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
-                  textFormat: Text.PlainText
-                  text: "\uf09b"
-                  color: repoMouse.containsMouse ? root.accent : root.bar.foreground
-                  opacity: repoMouse.containsMouse ? 1.0 : 0.6
-                  font.family: root.bar.fontFamily
-                  font.pixelSize: root.fontBody
+                  spacing: root.sp(8)
 
-                  MouseArea {
-                    id: repoMouse
-                    anchors.fill: parent
-                    anchors.margins: -root.sp(4)
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: if (root.bar) root.bar.run("xdg-open " + root.bar.shellQuote(root.repoUrl))
+                  Rectangle {
+                    visible: root.showHeaderInfo && root.version !== ""
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: versionText.implicitWidth + root.sp(10)
+                    height: versionText.implicitHeight + root.sp(4)
+                    radius: height / 2
+                    color: Util.alpha(root.accent, 0.15)
+                    border.width: 1
+                    border.color: Util.alpha(root.accent, 0.45)
+
+                    Text {
+                      id: versionText
+                      anchors.centerIn: parent
+                      textFormat: Text.PlainText
+                      text: "v" + root.version
+                      color: root.accent
+                      font.family: root.bar.fontFamily
+                      font.pixelSize: root.fontCaption
+                      font.bold: true
+                    }
                   }
 
-                  PanelToolTip {
-                    visible: repoMouse.containsMouse
-                    text: "Open on GitHub"
-                    fontFamily: root.bar.fontFamily
+                  // Opens the repository in the browser.
+                  Text {
+                    visible: root.showHeaderInfo
+                    anchors.verticalCenter: parent.verticalCenter
+                    textFormat: Text.PlainText
+                    text: "\uf09b"
+                    color: repoMouse.containsMouse ? root.accent : root.bar.foreground
+                    opacity: repoMouse.containsMouse ? 1.0 : 0.6
+                    font.family: root.bar.fontFamily
+                    font.pixelSize: root.fontBody
+
+                    MouseArea {
+                      id: repoMouse
+                      anchors.fill: parent
+                      anchors.margins: -root.sp(4)
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: if (root.bar) root.bar.run("xdg-open " + root.bar.shellQuote(root.repoUrl))
+                    }
+
+                    PanelToolTip {
+                      visible: repoMouse.containsMouse
+                      text: "Open on GitHub"
+                      fontFamily: root.bar.fontFamily
+                    }
                   }
                 }
               }
