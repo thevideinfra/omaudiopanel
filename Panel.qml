@@ -1030,7 +1030,7 @@ Panel {
         width: parent.width
         height: glyphHeight * root.barFill
         y: glyphTop + glyphHeight - height
-        Behavior on height { NumberAnimation { duration: 90 } }
+        Behavior on height { NumberAnimation { duration: 50 } }
 
         OpticalGlyph {
           y: -fillClip.y

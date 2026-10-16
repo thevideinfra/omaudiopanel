@@ -358,10 +358,11 @@ function eqBarLevels(peak, phase) {
 }
 
 // How far (0..1) the bar icon fills with accent colour for a PipeWire peak.
-// Muted or silent output leaves it empty; a floor keeps quiet audio visible.
+// Muted or silent output leaves it empty; a small floor keeps quiet audio
+// visible. Linear in the peak, so the fill moves with the beat.
 function barFillLevel(peak, muted) {
   if (muted || !(peak >= 0.01)) return 0
-  return Math.min(1, 0.15 + Math.sqrt(peak) * 0.95)
+  return Math.min(1, 0.1 + peak * 0.9)
 }
 
 // Accent colours the picker can offer, in this order, when the theme defines

@@ -196,7 +196,12 @@ test("barFillLevel rises with the peak, shows quiet audio and caps at 1", () => 
   const quiet = M.barFillLevel(0.02, false)
   const mid = M.barFillLevel(0.3, false)
   const loud = M.barFillLevel(1, false)
-  assert.ok(quiet >= 0.15 && quiet < mid && mid < loud)
+  assert.ok(quiet >= 0.1 && quiet < mid && mid < loud)
   assert.equal(loud, 1)
   assert.equal(M.barFillLevel(5, false), 1)
+})
+
+test("barFillLevel leaves headroom so a half-scale peak reads as about half", () => {
+  const half = M.barFillLevel(0.5, false)
+  assert.ok(half > 0.4 && half <= 0.6)
 })
