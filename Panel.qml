@@ -153,6 +153,7 @@ Panel {
   readonly property real fontCaption: Math.max(9, Math.round(Style.font.caption * fontScale))
   readonly property real fontDisplay: Math.round(Style.font.display * fontScale)
   readonly property bool showPlayingBars: Model.settingBool(setting("showPlayingBars", true), true)
+  readonly property bool showBarFill: Model.settingBool(setting("showBarFill", true), true)
   readonly property bool showRouting: Model.settingBool(setting("showRouting", true), true)
   readonly property bool showDisabled: Model.settingBool(setting("showDisabled", true), true)
   readonly property bool showSectionMutes: Model.settingBool(setting("showSectionMutes", true), true)
@@ -839,8 +840,12 @@ Panel {
   PwNodePeakMonitor {
     id: outputPeakMonitor
     node: root.volumeSink
-    enabled: root.opened && root.showPlayingBars && !!root.volumeSink
+    enabled: ((root.opened && root.showPlayingBars) || root.showBarFill) && !!root.volumeSink
   }
+
+  // How full the bar icon is with accent colour: the output level, empty
+  // while muted or silent.
+  readonly property real barFill: showBarFill ? Model.barFillLevel(outputPeakMonitor.peak, outputMuted) : 0
 
   // Animation phase shared by every EqBars, advanced only while open.
   property real eqPhase: 0
@@ -976,6 +981,7 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     text: root.outputIcon()
+    iconComponent: root.showBarFill ? barFillIcon : null
     onPressed: function(b) {
       if (b === Qt.RightButton) root.toggleAllMuted()
       else root.toggle()
@@ -991,6 +997,51 @@ Panel {
       var target = Math.round((root.outputVolume + wheel.steps * step) / step) * step
       var volume = root.setOutputVolume(target)
       root.showVolumeOsd(volume)
+    }
+  }
+
+  // The stock glyph, with an accent copy of it on top that is clipped from
+  // the bottom up to the output level.
+  Component {
+    id: barFillIcon
+
+    Item {
+      OpticalGlyph {
+        id: baseGlyph
+        anchors.fill: parent
+        text: button.text
+        fontFamily: button.fontFamily
+        fontSize: button.fontSize
+        color: button.foreground
+      }
+
+      TextMetrics {
+        id: glyphBox
+        font.family: button.fontFamily
+        font.pixelSize: baseGlyph.renderedFontSize
+        text: button.text
+      }
+
+      Item {
+        id: fillClip
+        clip: true
+        readonly property real glyphTop: baseGlyph.baselineY + glyphBox.tightBoundingRect.y
+        readonly property real glyphHeight: glyphBox.tightBoundingRect.height
+        width: parent.width
+        height: glyphHeight * root.barFill
+        y: glyphTop + glyphHeight - height
+        Behavior on height { NumberAnimation { duration: 90 } }
+
+        OpticalGlyph {
+          y: -fillClip.y
+          width: baseGlyph.width
+          height: baseGlyph.height
+          text: button.text
+          fontFamily: button.fontFamily
+          fontSize: button.fontSize
+          color: root.accent
+        }
+      }
     }
   }
 
@@ -2488,6 +2539,13 @@ Panel {
         label: "Playing bars"
         checked: root.showPlayingBars
         onToggled: root.setSetting("showPlayingBars", !root.showPlayingBars)
+      }
+
+      SettingSwitch {
+        width: parent.width
+        label: "Bar icon fill"
+        checked: root.showBarFill
+        onToggled: root.setSetting("showBarFill", !root.showBarFill)
       }
 
       SettingSwitch {

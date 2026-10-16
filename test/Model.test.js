@@ -184,3 +184,19 @@ test("parseDisabledDevices skips entries whose kind is not sink or source", () =
   const d = M.parseDisabledDevices("a\tsink\tA\nb\tbogus\tB\nc\t\tC\nd\tsource\tD\n")
   assert.deepEqual(d.map(x => x.name + ":" + x.kind), ["a:sink", "d:source"])
 })
+
+test("barFillLevel is empty when muted or silent", () => {
+  assert.equal(M.barFillLevel(0.8, true), 0)
+  assert.equal(M.barFillLevel(0, false), 0)
+  assert.equal(M.barFillLevel(0.005, false), 0)
+  assert.equal(M.barFillLevel(undefined, false), 0)
+})
+
+test("barFillLevel rises with the peak, shows quiet audio and caps at 1", () => {
+  const quiet = M.barFillLevel(0.02, false)
+  const mid = M.barFillLevel(0.3, false)
+  const loud = M.barFillLevel(1, false)
+  assert.ok(quiet >= 0.15 && quiet < mid && mid < loud)
+  assert.equal(loud, 1)
+  assert.equal(M.barFillLevel(5, false), 1)
+})

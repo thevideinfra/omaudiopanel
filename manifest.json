@@ -22,6 +22,7 @@
       "scrollStep": 5,
       "density": "normal",
       "showPlayingBars": true,
+      "showBarFill": true,
       "showRouting": true,
       "showDisabled": true,
       "showStepFooter": true,
@@ -86,6 +87,12 @@
         "key": "showPlayingBars",
         "type": "boolean",
         "label": "Show playing bars",
+        "defaultValue": true
+      },
+      {
+        "key": "showBarFill",
+        "type": "boolean",
+        "label": "Fill the bar icon with the playing level",
         "defaultValue": true
       },
       {

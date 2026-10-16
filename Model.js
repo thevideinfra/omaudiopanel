@@ -357,6 +357,13 @@ function eqBarLevels(peak, phase) {
   return bars
 }
 
+// How far (0..1) the bar icon fills with accent colour for a PipeWire peak.
+// Muted or silent output leaves it empty; a floor keeps quiet audio visible.
+function barFillLevel(peak, muted) {
+  if (muted || !(peak >= 0.01)) return 0
+  return Math.min(1, 0.15 + Math.sqrt(peak) * 0.95)
+}
+
 // Accent colours the picker can offer, in this order, when the theme defines
 // them.
 var ACCENT_NAMES = ["blue", "cyan", "green", "magenta", "yellow", "red", "orange"]
@@ -469,6 +476,7 @@ if (typeof module !== "undefined") {
     pinTarget: pinTarget,
     scrollTargetFor: scrollTargetFor,
     eqBarLevels: eqBarLevels,
+    barFillLevel: barFillLevel,
     manifestVersion: manifestVersion,
     parsePalette: parsePalette,
     accentChoices: accentChoices,
