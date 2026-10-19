@@ -365,6 +365,12 @@ function barFillLevel(peak, muted) {
   return Math.min(1, 0.1 + peak * 0.9)
 }
 
+// The highlight colour: the picked accent, or the neutral foreground when
+// accents are switched off.
+function accentFor(enabled, picked, neutral) {
+  return enabled ? picked : neutral
+}
+
 // Accent colours the picker can offer, in this order, when the theme defines
 // them.
 var ACCENT_NAMES = ["blue", "cyan", "green", "magenta", "yellow", "red", "orange"]
@@ -482,6 +488,7 @@ if (typeof module !== "undefined") {
     parsePalette: parsePalette,
     accentChoices: accentChoices,
     accentColor: accentColor,
+    accentFor: accentFor,
     densityScale: densityScale,
     settingBool: settingBool,
     fontSizeScale: fontSizeScale,

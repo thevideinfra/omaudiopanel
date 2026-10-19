@@ -205,3 +205,8 @@ test("barFillLevel leaves headroom so a half-scale peak reads as about half", ()
   const half = M.barFillLevel(0.5, false)
   assert.ok(half > 0.4 && half <= 0.6)
 })
+
+test("accentFor gives the picked accent when on and the neutral colour when off", () => {
+  assert.equal(M.accentFor(true, "#ff0000", "#cccccc"), "#ff0000")
+  assert.equal(M.accentFor(false, "#ff0000", "#cccccc"), "#cccccc")
+})

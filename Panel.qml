@@ -125,6 +125,7 @@ Panel {
   readonly property string density: String(setting("density", "normal"))
   readonly property real densityScale: Model.densityScale(density)
   readonly property string fontSize: String(setting("fontSize", "normal"))
+  readonly property bool showAccent: Model.settingBool(setting("showAccent", true), true)
   readonly property string accentChoice: String(setting("accent", "theme"))
   readonly property string repoUrl: "https://github.com/thevideinfra/omaudiopanel"
   property string version: ""
@@ -143,8 +144,9 @@ Panel {
   }
 
   // The colour the panel highlights with (sliders, switches, bars, stripes and
-  // chosen options): the theme's accent unless one is picked in settings.
-  readonly property color accent: accentSource.value
+  // chosen options): the theme's accent unless one is picked in settings, or
+  // the neutral foreground when accents are off.
+  readonly property color accent: Model.accentFor(showAccent, accentSource.value, bar.foreground)
   // Text shrinks half as fast as spacing so compact stays readable, then the
   // font size setting scales it on top.
   readonly property real fontScale: (0.5 + 0.5 * densityScale) * Model.fontSizeScale(fontSize)
@@ -1013,6 +1015,7 @@ Panel {
         fontFamily: button.fontFamily
         fontSize: button.fontSize
         color: button.foreground
+        opacity: root.showAccent ? 1 : 0.45
       }
 
       TextMetrics {
@@ -2516,7 +2519,18 @@ Panel {
       fontFamily: root.bar.fontFamily
     }
 
-    AccentPicker { width: parent.width }
+    SettingSwitch {
+      width: parent.width
+      label: "Accent colours"
+      checked: root.showAccent
+      onToggled: root.setSetting("showAccent", !root.showAccent)
+    }
+
+    AccentPicker {
+      width: parent.width
+      enabled: root.showAccent
+      opacity: root.showAccent ? 1 : 0.4
+    }
 
     PanelSeparator {
       foreground: root.bar.foreground

@@ -29,6 +29,7 @@
       "fontSize": "normal",
       "showSectionMutes": true,
       "accent": "theme",
+      "showAccent": true,
       "showHeaderInfo": true
     },
     "schema": [
@@ -72,6 +73,12 @@
         ],
         "defaultValue": "theme",
         "description": "The colour the panel highlights with: the theme's accent, or a colour from its palette."
+      },
+      {
+        "key": "showAccent",
+        "type": "boolean",
+        "label": "Accent colours",
+        "defaultValue": true
       },
       {
         "key": "scrollStep",
