@@ -47,7 +47,8 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
   output field under each app, the version and GitHub link, the Disabled
   section or the volume step footer.
 
-  <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, accent colour swatches from the theme's palette, switches for each part of the panel and the volume step" width="300">
+  <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, the accent colours switch on, swatches from the theme's palette, switches for each part of the panel and the volume step" width="300">
+  <img src="assets/omaudiosettingsneutral.png" alt="The same settings view with accent colours switched off: every highlight is grey and white" width="300">
 
 Changing the default output also leaves apps you routed or pinned where they
 are, instead of moving every stream to the new default.
