@@ -33,16 +33,19 @@ pickers, the per-app mixer, keyboard navigation — and it adds:
 - **See what is playing.** Small equalizer bars move next to OUTPUT and
   beside each app that is making sound, in your theme's accent colour — as do
   the volume sliders, level meters and the device in use.
+- **See the level in the bar.** The speaker icon in the bar fills with your
+  accent colour from the bottom up as the output plays, and empties when it is
+  muted or silent. Turn it off with the **Bar icon fill** switch.
 - **Pick the volume step.** 1%, 2%, 5% or 10% per scroll notch on the bar
   icon, per slider step and per `h`/`l` in the panel, chosen at the bottom of
   the panel.
 - **Make it yours.** The ⚙ in the panel header opens its settings: a
   **Compact**, **Normal** or **Comfortable** layout, a **Small**, **Normal**
   or **Large** font size, an accent colour (the theme's own, or any colour from
-  its palette), and switches to hide the
-  playing bars, the output and input mute switches, the output field under each app,
-  the version and GitHub link, the Disabled section or the
-  volume step footer.
+  its palette) or none at all, and switches to hide the
+  playing bars, the bar icon fill, the output and input mute switches, the
+  output field under each app, the version and GitHub link, the Disabled
+  section or the volume step footer.
 
   <img src="assets/omaudiosettings.png" alt="The settings view: density, font size, accent colour swatches from the theme's palette, switches for each part of the panel and the volume step" width="300">
 
@@ -108,9 +111,11 @@ click. From a terminal:
 |-------------------|------------|----------------------------------------------------------|
 | `density`         | `"normal"` | `"compact"`, `"normal"` or `"comfortable"`              |
 | `accent`          | `"theme"`  | `"theme"` or `"blue"`, `"cyan"`, `"green"`, `"magenta"`, `"yellow"`, `"red"`, `"orange"` (from the theme's palette) |
+| `showAccent`      | `true`     | `false` draws every highlight in the neutral foreground colour instead of the accent |
 | `fontSize`        | `"normal"` | `"small"`, `"normal"` or `"large"`, on top of density    |
 | `scrollStep`      | `5`        | Volume step in percent (1–25)                            |
 | `showPlayingBars` | `true`     | Equalizer bars next to OUTPUT and each playing app       |
+| `showBarFill`     | `true`     | The bar icon fills with the output level                 |
 | `showSectionMutes`| `true`     | Mute switches beside OUTPUT and INPUT                    |
 | `showRouting`     | `true`     | The "Playing on …" output field under each app           |
 | `showDisabled`    | `true`     | The Disabled devices section                             |
